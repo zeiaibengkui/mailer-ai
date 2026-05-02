@@ -1,5 +1,21 @@
 import nodemailer from "nodemailer";
-import { ImapFlow } from "imapflow";
+import { ImapFlow, type ImapFlowOptions } from "imapflow";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { simpleParser } from "mailparser";
+
+const SEEN_FILE = "data/seen.json";
+
+function getSeenUids(): Set<number> {
+    if (!existsSync(SEEN_FILE)) return new Set();
+    const data = readFileSync(SEEN_FILE, "utf-8");
+    return new Set(JSON.parse(data));
+}
+
+function saveSeenUid(uid: number) {
+    const seen = getSeenUids();
+    seen.add(uid);
+    writeFileSync(SEEN_FILE, JSON.stringify([...seen]));
+}
 
 const SMTP_CONFIG = {
     host: process.env.SMTP_HOST!,
@@ -11,7 +27,7 @@ const SMTP_CONFIG = {
     },
 };
 
-const IMAP_CONFIG = {
+const IMAP_CONFIG: ImapFlowOptions = {
     host: process.env.IMAP_HOST!,
     port: Number(process.env.IMAP_PORT!),
     secure: true,
@@ -19,6 +35,7 @@ const IMAP_CONFIG = {
         user: process.env.IMAP_USER!,
         pass: process.env.IMAP_PASS!,
     },
+    logger: false,
 };
 
 export const transporter = nodemailer.createTransport(SMTP_CONFIG);
@@ -40,14 +57,16 @@ export async function fetchUnseenEmails() {
     try {
         const lock = await client.getMailboxLock("INBOX");
         try {
+            const seenUids = getSeenUids();
             const messages: EmailMessage[] = [];
 
-            for await (const msg of client.fetch({ seen: false }, { source: true, envelope: true })) {
-                const text = msg.source?.toString() ?? "";
+            for await (const msg of client.fetch({ seen: false }, { source: true })) {
+                if (seenUids.has(msg.uid)) continue;
+                const parsed = await simpleParser(msg.source!);
                 messages.push({
-                    subject: msg.envelope?.subject ?? "",
-                    from: msg.envelope?.from?.[0]?.address ?? "",
-                    text,
+                    subject: parsed.subject ?? "",
+                    from: parsed.from?.text ?? "",
+                    text: parsed.text ?? "",
                     uid: msg.uid,
                 });
             }
@@ -88,8 +107,10 @@ export function onReceive(): Promise<EmailMessage> {
             if (messages.length > 0) {
                 const msg = messages[0];
                 await markAsSeen([msg.uid]);
+                saveSeenUid(msg.uid);
                 resolve(msg);
             } else {
+                process.stdout.write(`No New Emails ${(new Date()).toLocaleTimeString("en-US")}\r`);
                 setTimeout(poll, FETCH_INTERVAL_MS);
             }
         };

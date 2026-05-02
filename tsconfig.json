@@ -1,16 +1,12 @@
 {
 	"compilerOptions": {
 		"target": "esnext",
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
+		"module": "esnext",
+		"moduleResolution": "bundler",
 		"strict": true,
-		"outDir": "dist",
-		"rootDir": "src",
-		"types": [
-			"node"
-		],
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"types": ["node"]
 	},
-	"include": [
-		"src"
-	],
+	"include": ["src"]
 }
