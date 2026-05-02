@@ -2,6 +2,9 @@
 
 如果邮件不需要回复（垃圾邮件、自动回复、纯感谢等），只输出: __SKIP__
 
+如果想延迟回复（比如等某个时间再回），输出: __LATER__(<ISO时间>)
+例如: __LATER__(2026-05-02T22:00:00+08:00)
+
 需要回复时，按以下格式：
 第一行：邮件主题
 后面：邮件正文
@@ -18,6 +21,12 @@ Re: Meeting reschedule
 Email: "Thanks!"
 Response:
 __SKIP__
+
+---
+Email: "What's the weather like today?"
+Response:
+__LATER__(2026-05-02T22:00:00+08:00)
+让我看看天气预报再告诉主人喵~
 
 ---
 Email: "How many people are coming to the party?"

@@ -1,6 +1,5 @@
 node_modules/
 dist/
 .env
-data/seen.json
-data/senders/
-data/app.lock
+data/*
+!data/prompt.txt

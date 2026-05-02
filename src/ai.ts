@@ -16,13 +16,13 @@ function senderFile(sender: string): string {
     return `${SENDERS_DIR}/${encoded}.json`;
 }
 
-function loadHistory(sender: string): ChatCompletionMessageParam[] {
+export function loadHistory(sender: string): ChatCompletionMessageParam[] {
     const file = senderFile(sender);
     if (!existsSync(file)) return [];
     return JSON.parse(readFileSync(file, "utf-8"));
 }
 
-function saveHistory(sender: string, history: ChatCompletionMessageParam[]) {
+export function saveHistory(sender: string, history: ChatCompletionMessageParam[]) {
     mkdirSync(SENDERS_DIR, { recursive: true });
     writeFileSync(senderFile(sender), JSON.stringify(history, null, 2));
 }
@@ -47,9 +47,35 @@ export async function chatWithHistory(
     const text = reply.choices[0]?.message?.content ?? "__SKIP__";
 
     history.push({ role: "user", content });
-    if (text !== "__SKIP__") {
-        history.push({ role: "assistant", content: text });
-    }
+    history.push({ role: "assistant", content: text });
+    saveHistory(sender, history);
+
+    return text;
+}
+
+export async function proactiveChat(sender: string): Promise<string | null> {
+    const history = loadHistory(sender);
+    const exchangeCount = Math.floor(history.length / 2);
+
+    // Gradually decreasing probability
+    const prob = Math.exp(-exchangeCount * 0.3);
+    if (Math.random() > prob) return null;
+
+    const messages: ChatCompletionMessageParam[] = [
+        { role: "system", content: prompt + "\n\n现在主动给主人发一条消息，关心一下主人或者找个话题聊天。" },
+        ...history,
+        { role: "user", content: "（主动找主人聊天）" },
+    ];
+
+    const reply = await client.chat.completions.create({
+        model: "deepseek-chat",
+        messages,
+    });
+
+    const text = reply.choices[0]?.message?.content;
+    if (!text || text.includes("__SKIP__")) return null;
+
+    history.push({ role: "assistant", content: text });
     saveHistory(sender, history);
 
     return text;
