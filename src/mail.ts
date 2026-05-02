@@ -110,7 +110,7 @@ export function onReceive(): Promise<EmailMessage> {
                 saveSeenUid(msg.uid);
                 resolve(msg);
             } else {
-                process.stdout.write(`No New Emails ${(new Date()).toLocaleTimeString("en-US")}\r`);
+                process.stdout.write(`No New Emails Since ${(new Date()).toLocaleTimeString("en-US")}\r`);
                 setTimeout(poll, FETCH_INTERVAL_MS);
             }
         };

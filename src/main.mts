@@ -115,6 +115,7 @@ async function main() {
                 console.log(`[Proactive] Chatted with ${msg.from}: ${pr.subject}`);
             }
         }
+        /* End Main Loop */
     }
 }
 

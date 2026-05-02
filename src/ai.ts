@@ -64,7 +64,11 @@ export async function proactiveChat(sender: string): Promise<string | null> {
     const messages: ChatCompletionMessageParam[] = [
         { role: "system", content: prompt + "\n\n现在主动给主人发一条消息，关心一下主人或者找个话题聊天。" },
         ...history,
-        { role: "user", content: "（主动找主人聊天）" },
+        {
+            role: "user",
+            content: "（主动找主人聊天,太晚了就__SKIP__或者__LATER__吧。" +
+                "如果留了定时任务，可以现在设置__LATER__）"
+        },
     ];
 
     const reply = await client.chat.completions.create({
