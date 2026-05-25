@@ -53,38 +53,6 @@ export async function chatWithHistory(
     return text;
 }
 
-export async function proactiveChat(sender: string): Promise<string | null> {
-    const history = loadHistory(sender);
-    const exchangeCount = Math.floor(history.length / 2);
-
-    // Gradually decreasing probability
-    const prob = Math.exp(-exchangeCount * 0.3);
-    if (Math.random() > prob) return null;
-
-    const messages: ChatCompletionMessageParam[] = [
-        { role: "system", content: prompt + "\n\n现在主动给主人发一条消息，关心一下主人或者找个话题聊天。" },
-        ...history,
-        {
-            role: "user",
-            content: "（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
-                "如果主人留了定时任务但你没设__LATER__，可以现在设置）",
-        },
-    ];
-
-    const reply = await client.chat.completions.create({
-        model: "deepseek-v4-flash",
-        messages,
-    });
-
-    const text = reply.choices[0]?.message?.content;
-    if (!text || text.includes("__SKIP__")) return null;
-
-    history.push({ role: "assistant", content: text });
-    saveHistory(sender, history);
-
-    return text;
-}
-
 export function extractReply(text: string): { subject: string; body: string; } | null {
     const lines = text.trim().split("\n");
     const filtered = lines.filter((l) => !/同意回复/.test(l));

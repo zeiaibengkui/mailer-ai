@@ -1,6 +1,7 @@
 import { readdirSync, existsSync, readFileSync, writeFileSync } from "fs";
-import { sendEmail } from "./mail.ts";
-import { proactiveChat, extractReply } from "./ai.ts";
+import { processAIReply } from "./replyHandler.ts";
+import type { ChatCompletionMessageParam } from "openai/resources";
+import { loadHistory, prompt, client, saveHistory } from "./ai.ts";
 
 const TRACK_FILE = "data/proactive_tracker.json";
 const INTERVAL_MS = Number(process.env.PROACTIVE_INTERVAL_MS) || 300000;
@@ -32,16 +33,47 @@ export async function processProactive() {
         const text = await proactiveChat(sender);
         if (!text) continue;
 
-        const r = extractReply(text);
-        if (!r) continue;
-
-        await sendEmail(sender, r.subject, r.body);
-        tracker[sender] = new Date().toISOString();
-        saveTracker(tracker);
-        console.log(`[Proactive] Chatted with ${sender}: ${r.subject}`);
+        const result = await processAIReply(sender, text);
+        if (result === "sent") {
+            tracker[sender] = new Date().toISOString();
+            saveTracker(tracker);
+        }
     }
 }
 
 export function startProactive() {
     setInterval(processProactive, INTERVAL_MS);
 }
+
+export async function proactiveChat(sender: string): Promise<string | null> {
+    const history = loadHistory(sender);
+    const exchangeCount = Math.floor(history.length / 2);
+
+    // Gradually decreasing probability
+    const prob = Math.exp(-exchangeCount * 0.3);
+    if (Math.random() > prob) return null;
+
+    const messages: ChatCompletionMessageParam[] = [
+        { role: "system", content: prompt + "\n\n现在主动给主人发一条消息，关心一下主人或者找个话题聊天。" },
+        ...history,
+        {
+            role: "user",
+            content: "（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
+                "如果主人留了定时任务但你没设__LATER__，可以现在设置）",
+        },
+    ];
+
+    const reply = await client.chat.completions.create({
+        model: "deepseek-v4-flash",
+        messages,
+    });
+
+    const text = reply.choices[0]?.message?.content;
+    if (!text || text.includes("__SKIP__")) return null;
+
+    history.push({ role: "assistant", content: text });
+    saveHistory(sender, history);
+
+    return text;
+}
+

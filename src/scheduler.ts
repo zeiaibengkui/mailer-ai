@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { randomUUID } from "node:crypto";
-import { chatWithHistory, extractReply } from "./ai";
-import { sendEmail } from "./mail";
+import { chatWithHistory } from "./ai";
+import { processAIReply } from "./replyHandler";
 
 const CRONTAB_FILE = "data/crontab.json";
 
@@ -53,35 +52,7 @@ export async function processCrontab() {
                 "另外现在这个时间也可以写到正文里。"
             );
 
-            if (text.includes("__SKIP__")) {
-                console.log(`[Crontab] Decided to skip reply to ${task.sender}`);
-                continue;
-            }
-
-            // Also handle __LATER__ from this decision (re-schedule)
-            if (text.includes("__LATER__")) {
-                const laterTime = handleLater(text);
-                if (laterTime) {
-                    addTask({
-                        id: randomUUID(),
-                        sender: task.sender,
-                        scheduledAt: laterTime.toISOString(),
-                    });
-                    console.log(
-                        `[Crontab] Re-scheduled for ${task.sender} at ${laterTime.toISOString()}`
-                    );
-                }
-                continue;
-            }
-
-            const r = extractReply(text);
-            if (!r) {
-                console.log(`[Crontab] Could not parse reply for ${task.sender}, skipping`);
-                continue;
-            }
-
-            await sendEmail(task.sender, r.subject, r.body);
-            console.log(`[Crontab] Sent timed reply to ${task.sender}: ${r.subject}`);
+            await processAIReply(task.sender, text);
         } catch (e) {
             console.error(`[Crontab] Failed for ${task.sender}:`, e);
         }
