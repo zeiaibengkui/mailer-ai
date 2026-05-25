@@ -2,7 +2,6 @@ import "dotenv/config";
 import { onReceive, sendEmail } from "./mail.ts";
 import {
     chatWithHistory,
-    proactiveChat,
     loadHistory,
     saveHistory,
     extractReply,
@@ -10,21 +9,22 @@ import {
 import {
     addTask, CRONTAB_CHECK_MS, handleLater, processCrontab
 } from "./scheduler.ts";
+import { startProactive } from "./proactive.ts";
 import "./utils/checkLock.mts";
 import { randomUUID } from "crypto";
 
 async function main() {
     console.log("Mailer AI started. Waiting for emails...");
 
-    // Periodically check crontab
     setInterval(processCrontab, CRONTAB_CHECK_MS);
+    startProactive();
 
     while (true) {
         const msg = await onReceive();
-        console.log(`Received: "${msg.subject}" from ${msg.from}`);
+        console.log(`Received: "${msg.subject}" from ${msg.from} at ${msg.date}`);
         const text = await chatWithHistory(
             msg.from,
-            `Subject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`,
+            `Date: ${msg.date}\nProcess: ${new Date().toISOString()}\nSubject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`,
         );
 
         // Skip
@@ -63,25 +63,8 @@ async function main() {
             continue;
         }
 
-        // Reply as Default
         await sendEmail(msg.from, r.subject, r.body);
         console.log(`Replied to ${msg.from}: ${r.subject}`);
-
-        // Proactive chat after reply
-        // 简陋
-        const DISABLE = 0;
-        const pro = await proactiveChat(msg.from);
-        let pr
-        if (pro && !DISABLE) pr = extractReply(pro);
-
-        if (pr) {
-            await sendEmail(msg.from, pr.subject, pr.body);
-            console.log(
-                `[Proactive] Chatted with ${msg.from}: ${pr.subject}`,
-            );
-
-        }
-        /* End Main Loop */
     }
 }
 

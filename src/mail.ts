@@ -68,6 +68,7 @@ export async function fetchUnseenEmails() {
                     from: parsed.from?.text ?? "",
                     text: parsed.text ?? "",
                     uid: msg.uid,
+                    date: parsed.date?.toISOString() ?? "",
                 });
             }
 
@@ -98,7 +99,7 @@ export async function markAsSeen(uids: number[]) {
 
 const FETCH_INTERVAL_MS = Number(process.env.FETCH_INTERVAL_MS!) || 30000;
 
-export type EmailMessage = { subject: string; from: string; text: string; uid: number };
+export type EmailMessage = { subject: string; from: string; text: string; uid: number; date: string };
 
 export function onReceive(): Promise<EmailMessage> {
     return new Promise(async (resolve) => {

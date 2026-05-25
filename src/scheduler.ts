@@ -1,8 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { randomUUID } from "node:crypto";
-import { chatWithHistory, proactiveChat } from "./ai";
+import { chatWithHistory, extractReply } from "./ai";
 import { sendEmail } from "./mail";
-import { extractReply } from "./ai";
 
 const CRONTAB_FILE = "data/crontab.json";
 
@@ -83,15 +82,6 @@ export async function processCrontab() {
 
             await sendEmail(task.sender, r.subject, r.body);
             console.log(`[Crontab] Sent timed reply to ${task.sender}: ${r.subject}`);
-
-            const pro = await proactiveChat(task.sender);
-            if (pro) {
-                const pr = extractReply(pro);
-                if (pr) {
-                    await sendEmail(task.sender, pr.subject, pr.body);
-                    console.log(`[Proactive] Chatted with ${task.sender}: ${pr.subject}`);
-                }
-            }
         } catch (e) {
             console.error(`[Crontab] Failed for ${task.sender}:`, e);
         }
