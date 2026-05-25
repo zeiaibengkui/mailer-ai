@@ -66,13 +66,13 @@ export async function proactiveChat(sender: string): Promise<string | null> {
         ...history,
         {
             role: "user",
-            content: "（主动找主人聊天,太晚了就__SKIP__或者__LATER__吧。" +
-                "如果留了定时任务，可以现在设置__LATER__）"
+            content: "（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
+                "如果主人留了定时任务但你没设__LATER__，可以现在设置）",
         },
     ];
 
     const reply = await client.chat.completions.create({
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         messages,
     });
 
@@ -84,3 +84,13 @@ export async function proactiveChat(sender: string): Promise<string | null> {
 
     return text;
 }
+
+export function extractReply(text: string): { subject: string; body: string; } | null {
+    const lines = text.trim().split("\n");
+    const filtered = lines.filter((l) => !/同意回复/.test(l));
+    const subject = filtered[0];
+    const body = filtered.slice(1).join("\n").trim();
+    if (!subject) return null;
+    return { subject, body };
+}
+
