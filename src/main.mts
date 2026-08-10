@@ -14,7 +14,9 @@ async function main() {
 
     while (true) {
         const msg = await onReceive();
-        console.log(`Received: "${msg.subject}" from ${msg.from} at ${msg.date}`);
+        console.log(
+            `Received: "${msg.subject}" from ${msg.from} at ${msg.date}`,
+        );
         const text = await chatWithHistory(
             msg.from,
             `Date: ${msg.date}\nProcess: ${new Date().toISOString()}\nSubject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`,
