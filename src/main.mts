@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { onReceive } from "./mail.ts";
+import { markHandled, onReceive } from "./mail.ts";
 import { chatWithHistory } from "./ai.ts";
 import { processAIReply } from "./replyHandler.ts";
 import { CRONTAB_CHECK_MS, processCrontab } from "./scheduler.ts";
@@ -19,10 +19,11 @@ async function main() {
         );
         const text = await chatWithHistory(
             msg.from,
-            `Date: ${msg.date}\nProcess: ${new Date().toISOString()}\nSubject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`,
+            `Date: ${msg.date}\nSubject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`,
         );
 
         await processAIReply(msg.from, text);
+        await markHandled(msg.uid);
     }
 }
 

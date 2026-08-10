@@ -97,6 +97,12 @@ export async function markAsSeen(uids: number[]) {
     }
 }
 
+/** Mark an email as handled (server \Seen flag + local dedup) after its reply is complete. */
+export async function markHandled(uid: number) {
+    await markAsSeen([uid]);
+    saveSeenUid(uid);
+}
+
 const FETCH_INTERVAL_MS = Number(process.env.FETCH_INTERVAL_MS!) || 30000;
 
 export type EmailMessage = { subject: string; from: string; text: string; uid: number; date: string };
@@ -106,10 +112,7 @@ export function onReceive(): Promise<EmailMessage> {
         const poll = async () => {
             const messages = await fetchUnseenEmails();
             if (messages.length > 0) {
-                const msg = messages[0];
-                await markAsSeen([msg.uid]);
-                saveSeenUid(msg.uid);
-                resolve(msg);
+                resolve(messages[0]);
             } else {
                 process.stdout.write(`No New Emails Since ${(new Date()).toLocaleTimeString("en-US")}\r`);
                 setTimeout(poll, FETCH_INTERVAL_MS);

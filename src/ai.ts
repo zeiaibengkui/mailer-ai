@@ -27,6 +27,22 @@ export function saveHistory(sender: string, history: ChatCompletionMessageParam[
     writeFileSync(senderFile(sender), JSON.stringify(history, null, 2));
 }
 
+/** Register a sender so the proactive loop will pick them up, even before they email. */
+export function ensureSender(sender: string): boolean {
+    const file = senderFile(sender);
+    if (existsSync(file)) return false;
+    mkdirSync(SENDERS_DIR, { recursive: true });
+    writeFileSync(file, "[]");
+    return true;
+}
+
+/** Prepend the current time so the AI always knows "now" when deciding to reply/schedule. */
+export function withCurrentTime(content: string): string {
+    const now = new Date();
+    const local = now.toLocaleString("zh-CN", { hour12: false });
+    return `当前时间: ${local} (${now.toISOString()})\n\n${content}`;
+}
+
 export async function chatWithHistory(
     sender: string,
     content: string,
@@ -36,7 +52,7 @@ export async function chatWithHistory(
     const messages: ChatCompletionMessageParam[] = [
         { role: "system", content: prompt },
         ...history,
-        { role: "user", content },
+        { role: "user", content: withCurrentTime(content) },
     ];
 
     const reply = await client.chat.completions.create({

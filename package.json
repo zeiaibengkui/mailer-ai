@@ -6,7 +6,8 @@
 	"main": "src/main.mts",
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1",
-		"start": "tsx watch src/main.mts"
+		"start": "tsx watch src/main.mts",
+		"add-sender": "tsx scripts/addSender.mts"
 	},
 	"keywords": [],
 	"author": "",

@@ -38,6 +38,14 @@ pnpm start
 
 Uses `tsx watch` — auto-restarts on file changes.
 
+## Add a Contact
+
+```bash
+pnpm add-sender "friend@example.com"
+```
+
+Registers an email address so the bot will start proactively messaging it on the next proactive tick (creates an empty history file in `data/senders/`).
+
 ## Project Structure
 
 ```

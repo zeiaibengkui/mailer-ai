@@ -1,7 +1,7 @@
 import { readdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { processAIReply } from "./replyHandler.ts";
 import type { ChatCompletionMessageParam } from "openai/resources";
-import { loadHistory, prompt, client, saveHistory } from "./ai.ts";
+import { loadHistory, prompt, client, saveHistory, withCurrentTime } from "./ai.ts";
 
 const TRACK_FILE = "data/proactive_tracker.json";
 const INTERVAL_MS = Number(process.env.PROACTIVE_INTERVAL_MS) || 300000;
@@ -58,8 +58,8 @@ export async function proactiveChat(sender: string): Promise<string | null> {
         ...history,
         {
             role: "user",
-            content: "（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
-                "如果主人留了定时任务但你没设__LATER__，可以现在设置）",
+            content: withCurrentTime("（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
+                "如果主人留了定时任务但你没设__LATER__，可以现在设置）"),
         },
     ];
 
