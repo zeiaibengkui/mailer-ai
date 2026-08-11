@@ -24,6 +24,9 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import FlashOnIcon from '@mui/icons-material/FlashOn'
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
+import NotificationsOffIcon from '@mui/icons-material/NotificationsOff'
 import SendIcon from '@mui/icons-material/Send'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import {
@@ -34,7 +37,9 @@ import {
   useSenderHistory,
   useSenders,
   useSendMessage,
+  useSetProactiveMuted,
   useTasks,
+  useTriggerProactive,
   type SenderSummary,
   type ScheduledTask,
 } from '../api/hooks.ts'
@@ -46,7 +51,7 @@ import { Monogram } from '../components/Monogram.tsx'
 import { TYPE } from '../theme.ts'
 import { formatDateTime, timeUntil } from '../utils.ts'
 
-type Notice = { severity: 'success' | 'error'; message: string } | null
+type Notice = { severity: 'success' | 'info' | 'error'; message: string } | null
 
 function AddSenderDialog({
   open,
@@ -239,6 +244,8 @@ export default function CharacterDetail() {
   const addSender = useAddSender(name)
   const deleteSender = useDeleteSender(name)
   const deleteTask = useDeleteTask(name)
+  const setProactiveMuted = useSetProactiveMuted(name)
+  const triggerProactive = useTriggerProactive(name)
 
   const [addOpen, setAddOpen] = useState(false)
   const [historySender, setHistorySender] = useState<SenderSummary | null>(null)
@@ -247,6 +254,41 @@ export default function CharacterDetail() {
   >(null)
   const [composeOpen, setComposeOpen] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+  const [busySender, setBusySender] = useState<string | null>(null)
+
+  const toggleMute = (s: SenderSummary) => {
+    setProactiveMuted.mutate(
+      { senderId: s.id, muted: !s.muted },
+      {
+        onSuccess: () =>
+          setNotice({
+            severity: 'success',
+            message: s.muted ? `Proactive unmuted for ${s.sender}` : `Proactive muted for ${s.sender}`,
+          }),
+        onError: (e) => setNotice({ severity: 'error', message: e.message }),
+      },
+    )
+  }
+
+  const trigger = (s: SenderSummary) => {
+    setBusySender(s.id)
+    triggerProactive.mutate(s.id, {
+      onSuccess: (res) => {
+        setBusySender(null)
+        const byStatus: Record<string, string> = {
+          sent: `Proactive message sent to ${s.sender}`,
+          later: `Proactive reply scheduled for ${s.sender}`,
+          skip: `The agent decided not to message ${s.sender} right now`,
+          no_reply: `No reply generated for ${s.sender}`,
+        }
+        setNotice({ severity: res.status === 'sent' ? 'success' : 'info', message: byStatus[res.status] })
+      },
+      onError: (e) => {
+        setBusySender(null)
+        setNotice({ severity: 'error', message: e.message })
+      },
+    })
+  }
 
   const confirmDelete = () => {
     if (!deleteTarget) return
@@ -330,14 +372,51 @@ export default function CharacterDetail() {
             </TableHead>
             <TableBody>
               {senders.data.map((s) => (
-                <TableRow key={s.id}>
+                <TableRow key={s.id} sx={s.muted ? { opacity: 0.55 } : undefined}>
                   <TableCell sx={{ fontSize: '0.74rem', wordBreak: 'break-all', fontFamily: TYPE.mono }}>
                     {s.sender}
+                    {s.muted && (
+                      <Chip
+                        label="muted"
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        sx={{ ml: 1, fontSize: '0.6rem', height: 18 }}
+                      />
+                    )}
                   </TableCell>
                   <TableCell align="right" sx={{ fontSize: '0.74rem', fontFamily: TYPE.mono }}>
                     {s.exchanges}
                   </TableCell>
                   <TableCell align="right">
+                    <Tooltip title={s.muted ? 'Unmute proactive' : 'Mute proactive'}>
+                      <IconButton
+                        size="small"
+                        color={s.muted ? 'warning' : 'default'}
+                        disabled={setProactiveMuted.isPending}
+                        onClick={() => toggleMute(s)}
+                      >
+                        {s.muted ? (
+                          <NotificationsOffIcon fontSize="small" />
+                        ) : (
+                          <NotificationsActiveIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Send a proactive message now">
+                      <IconButton
+                        size="small"
+                        color="secondary"
+                        disabled={busySender === s.id}
+                        onClick={() => trigger(s)}
+                      >
+                        {busySender === s.id ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <FlashOnIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="View correspondence">
                       <IconButton size="small" onClick={() => setHistorySender(s)}>
                         <VisibilityIcon fontSize="small" />

@@ -28,6 +28,16 @@ export interface SenderSummary {
   id: string
   sender: string
   exchanges: number
+  /** Proactive messages to this sender are muted (never sent proactively). */
+  muted: boolean
+  /** ISO time of the last proactive message actually sent, or null. */
+  lastProactive: string | null
+}
+
+export interface ProactiveTriggerResult {
+  ok: boolean
+  sender: string
+  status: 'skip' | 'later' | 'sent' | 'no_reply'
 }
 
 export interface CharacterInfo {
@@ -187,6 +197,38 @@ export function useSendMessage(name: string) {
         { method: 'POST', body: JSON.stringify(msg) },
       ),
     // Sending to a new address creates a sender, so refresh the sender list too.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Mute (block) or unmute proactive messages for a sender. */
+export function useSetProactiveMuted(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: { senderId: string; muted: boolean }) =>
+      apiFetch<{ ok: boolean; sender: string; muted: boolean }>(
+        `/characters/${encodeURIComponent(name)}/senders/${encodeURIComponent(args.senderId)}/proactive`,
+        { method: 'PATCH', body: JSON.stringify({ muted: args.muted }) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Manually trigger one proactive message to a sender now. */
+export function useTriggerProactive(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (senderId: string) =>
+      apiFetch<ProactiveTriggerResult>(
+        `/characters/${encodeURIComponent(name)}/senders/${encodeURIComponent(senderId)}/proactive`,
+        { method: 'POST' },
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.senders(name) })
       qc.invalidateQueries({ queryKey: qk.status })

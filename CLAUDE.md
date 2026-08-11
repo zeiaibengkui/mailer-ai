@@ -12,7 +12,7 @@ Mailer AI is an always-on email auto-reply bot that runs **multiple independent 
 - **Register a contact**: `pnpm add-sender <character> <email> [more...]` — creates an empty history file for that sender under the character's `senders/` dir so the proactive loop will message them.
 - **Install**: `pnpm install`
 - **Typecheck**: `npx tsc --noEmit` (tsconfig has `noEmit: true`; there is no build step).
-- **Control API**: `src/api.ts` starts a Hono server on `127.0.0.1:API_PORT` (default 3000) with always-on `Bearer` auth. `API_KEY` in `.env` is **required** (startup exits without it; the key is never logged). See README "REST Control API" for the endpoint table. Sender `id`s in API URLs are URL-safe base64 (via `encodeSenderId`/`decodeSenderId` in `ai.ts`), while on-disk filenames use standard base64.
+- **Control API**: `src/api.ts` starts a Hono server on `127.0.0.1:API_PORT` (default 3000) with always-on `Bearer` auth. `API_KEY` in `.env` is **required** (startup exits without it; the key is never logged). See README "REST Control API" for the endpoint table. Sender `id`s in API URLs are URL-safe base64 (via `encodeSenderId`/`decodeSenderId` in `ai.ts`), while on-disk filenames use standard base64. Proactive controls: `PATCH /characters/:name/senders/:senderId/proactive` body `{muted: bool}` toggles per-sender mute; `POST` on the same path forces one proactive message now (bypasses the probability gate + min-gap, but the model can still `__SKIP__`/`__LATER__`).
 - **Tests**: none. `pnpm test` just prints an error. Verify changes by running the bot and watching logs.
 
 ## Architecture
@@ -34,7 +34,7 @@ All modules are **parameterized by `Character`** (from `src/character.ts`) — t
 - **`src/api.ts`** — Hono server (`@hono/node-server`) on `127.0.0.1`, started fire-and-forget from `main.mts`. Reuses the loaded `Character[]`; state is file-based so the loops stay in sync with API writes. All handlers wrap errors and return 4xx/5xx JSON instead of crashing.
 - **`src/replyHandler.ts`** — `processAIReply(char, sender, text)` dispatches on the model's output: `__SKIP__` → no-op; `__LATER__(<ISO time>)` → `addTask(char, ...)`; otherwise `extractReply` + `sendEmail(char, ...)`. Returns a status string (`skip | later | sent | no_reply`).
 - **`src/scheduler.ts`** — per-character file-based "crontab" (`char.dir/crontab.json`) of tasks `{id, sender, scheduledAt}`. When a task is due it removes it and asks the AI whether to reply now, then routes through `processAIReply`. The due-task message the AI sees comes from `prompts/crontab.md` (falls back to a default in code).
-- **`src/proactive.ts`** — per character, for each sender with history, with probability `exp(-exchangeCount * 0.3)` (decays as conversation grows), prompts the model to send an unsolicited message. Enforces a minimum gap (`char.conf.bot.proactive_min_gap_ms`) via `char.dir/proactive_tracker.json`. Only updates the tracker when a message is actually sent. Uses `char.conf.bot.proactive_model`. The wake-up (system) and trigger (user) prompt text come from `prompts/proactive.md` (falls back to defaults in code).
+- **`src/proactive.ts`** — per character, for each sender with history, with probability `exp(-exchangeCount * 0.3)` (decays as conversation grows), prompts the model to send an unsolicited message. Enforces a minimum gap (`char.conf.bot.proactive_min_gap_ms`) via `char.dir/proactive_tracker.json`. Only updates the tracker when a message is actually sent. Uses `char.conf.bot.proactive_model`. The wake-up (system) and trigger (user) prompt text come from `prompts/proactive.md` (falls back to defaults in code). Also supports per-sender mute: `setMuted` stores a `__muted__` sentinel (or `__muted__:<iso>` to preserve the last-proactive time across the mute), skipped by `processProactive`; `triggerProactive` forces one proactive message for a sender now (manual dashboard control, preserves mute state).
 - **`src/utils/checkLock.mts`** — single global PID lock (`characters/.lock`); exits if the file exists. Note: it only checks existence, not liveness, so a stale lock file blocks startup.
 
 ### AI reply protocol (defined in `prompts/base.md`, shared by all characters)
@@ -49,7 +49,7 @@ The model must output exactly one of:
 - `senders/<base64(sender)>.json` — per-sender chat history as an OpenAI `ChatCompletionMessageParam[]`. Filename is the bare-email sender base64-encoded (see `normalizeSender`). `proactive_tracker.json` and `crontab.json` also key by the bare email, so a display-name form (`"Name" <user@host>`) and the bare form collapse to the same entry.
 - `seen.json` — array of seen email UIDs.
 - `crontab.json` — pending scheduled tasks (runtime).
-- `proactive_tracker.json` — last proactive message time per sender.
+- `proactive_tracker.json` — last proactive message time per sender; a `__muted__` (or `__muted__:<iso>`) value marks the sender as muted (never proactively messaged).
 - `conf.toml` — IMAP/SMTP credentials + per-character settings (gitignored).
 
 ## Gotchas

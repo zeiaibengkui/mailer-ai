@@ -12,7 +12,7 @@ import {
     deleteSender,
 } from "./ai.ts";
 import { loadTasks, removeTask } from "./scheduler.ts";
-import { clearTrackerEntry } from "./proactive.ts";
+import { clearTrackerEntry, setMuted, senderProactiveStates, triggerProactive } from "./proactive.ts";
 import { sendEmail } from "./mail.ts";
 import { normalizeSender } from "./sender.ts";
 
@@ -44,6 +44,17 @@ export function startApi(chars: Character[]) {
     });
 
     const findChar = (name: string) => chars.find((c) => c.name === name);
+
+    // Sender summaries enriched with per-sender proactive state (muted + last-proactive),
+    // so the dashboard can render mute toggles and "last proactively messaged" info.
+    const sendersDetailed = (ch: Character) => {
+        const states = senderProactiveStates(ch);
+        return listSenders(ch).map((s) => ({
+            ...s,
+            muted: states[s.sender]?.muted ?? false,
+            lastProactive: states[s.sender]?.lastProactive ?? null,
+        }));
+    };
 
     app.get("/health", (c) => c.json({ ok: true }));
 
@@ -84,7 +95,7 @@ export function startApi(chars: Character[]) {
             imap: { host: ch.conf.imap.host, port: ch.conf.imap.port, secure: ch.conf.imap.secure, user: ch.conf.imap.user },
             smtp: { host: ch.conf.smtp.host, port: ch.conf.smtp.port, secure: ch.conf.smtp.secure, user: ch.conf.smtp.user },
             bot: ch.conf.bot,
-            senders: listSenders(ch),
+            senders: sendersDetailed(ch),
             tasks: loadTasks(ch),
         });
     });
@@ -92,7 +103,7 @@ export function startApi(chars: Character[]) {
     app.get("/characters/:name/senders", (c) => {
         const ch = findChar(c.req.param("name"));
         if (!ch) return c.json({ error: "unknown character" }, 404);
-        return c.json(listSenders(ch));
+        return c.json(sendersDetailed(ch));
     });
 
     app.post("/characters/:name/senders", async (c) => {
@@ -119,6 +130,33 @@ export function startApi(chars: Character[]) {
         deleteSender(ch, sender);
         clearTrackerEntry(ch, sender);
         return c.json({ ok: true, sender });
+    });
+
+    // Mute/unmute proactive messages for a sender: `{ "muted": true|false }`.
+    app.patch("/characters/:name/senders/:senderId/proactive", async (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        const body = await c.req.json().catch(() => null);
+        if (typeof body?.muted !== "boolean") {
+            return c.json({ error: "body requires a boolean `muted`" }, 400);
+        }
+        const sender = decodeSenderId(c.req.param("senderId"));
+        setMuted(ch, sender, body.muted);
+        return c.json({ ok: true, sender, muted: body.muted });
+    });
+
+    // Manually trigger one proactive message to a sender now (bypasses probability + min-gap).
+    app.post("/characters/:name/senders/:senderId/proactive", async (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        const sender = decodeSenderId(c.req.param("senderId"));
+        try {
+            const status = await triggerProactive(ch, sender);
+            return c.json({ ok: true, sender, status });
+        } catch (e) {
+            console.error(`[${ch.name}] [api] proactive trigger failed:`, e);
+            return c.json({ error: "proactive trigger failed" }, 500);
+        }
     });
 
     app.get("/characters/:name/tasks", (c) => {
