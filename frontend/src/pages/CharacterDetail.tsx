@@ -23,17 +23,25 @@ import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
+import BlockIcon from '@mui/icons-material/Block'
 import DeleteIcon from '@mui/icons-material/Delete'
 import FlashOnIcon from '@mui/icons-material/FlashOn'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff'
+import NoteAddIcon from '@mui/icons-material/NoteAdd'
+import RestoreIcon from '@mui/icons-material/Restore'
 import SendIcon from '@mui/icons-material/Send'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import {
+  useAddBan,
+  useAddMemory,
   useAddSender,
+  useBanned,
   useCharacter,
   useDeleteSender,
   useDeleteTask,
+  useMemory,
+  useRemoveBan,
   useSenderHistory,
   useSenders,
   useSendMessage,
@@ -235,6 +243,104 @@ function ComposeDialog({
   )
 }
 
+function AddMemoryDialog({
+  open,
+  onClose,
+  onAdd,
+  pending,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (sender: string, content: string) => void
+  pending: boolean
+}) {
+  const [sender, setSender] = useState('')
+  const [content, setContent] = useState('')
+  const canAdd = !!sender.trim() && !!content.trim()
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Add memory</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            autoFocus
+            label="About (sender email)"
+            placeholder="friend@example.com"
+            value={sender}
+            onChange={(e) => setSender(e.target.value)}
+          />
+          <TextField
+            label="Memory"
+            multiline
+            minRows={3}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            helperText="What should this character remember — and about whom. Injected into every future chat."
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={pending}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<NoteAddIcon />}
+          disabled={!canAdd || pending}
+          onClick={() => onAdd(sender.trim(), content.trim())}
+        >
+          {pending ? 'Adding…' : 'Add'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+function BanSenderDialog({
+  open,
+  onClose,
+  onBan,
+  pending,
+}: {
+  open: boolean
+  onClose: () => void
+  onBan: (email: string) => void
+  pending: boolean
+}) {
+  const [email, setEmail] = useState('')
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Ban sender</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          fullWidth
+          label="Email address"
+          placeholder="spammer@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          margin="dense"
+          helperText="This character will never reply to this address again (__BAN__)."
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={pending}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          color="error"
+          startIcon={<BlockIcon />}
+          disabled={!email.trim() || pending}
+          onClick={() => onBan(email.trim())}
+        >
+          {pending ? 'Banning…' : 'Ban'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 export default function CharacterDetail() {
   const { name = '' } = useParams()
   const char = useCharacter(name)
@@ -246,6 +352,11 @@ export default function CharacterDetail() {
   const deleteTask = useDeleteTask(name)
   const setProactiveMuted = useSetProactiveMuted(name)
   const triggerProactive = useTriggerProactive(name)
+  const memory = useMemory(name)
+  const addMemory = useAddMemory(name)
+  const banned = useBanned(name)
+  const addBan = useAddBan(name)
+  const removeBan = useRemoveBan(name)
 
   const [addOpen, setAddOpen] = useState(false)
   const [historySender, setHistorySender] = useState<SenderSummary | null>(null)
@@ -253,6 +364,8 @@ export default function CharacterDetail() {
     { kind: 'sender' | 'task'; id: string; label: string } | null
   >(null)
   const [composeOpen, setComposeOpen] = useState(false)
+  const [addMemoryOpen, setAddMemoryOpen] = useState(false)
+  const [banOpen, setBanOpen] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [busySender, setBusySender] = useState<string | null>(null)
 
@@ -280,6 +393,7 @@ export default function CharacterDetail() {
           later: `Proactive reply scheduled for ${s.sender}`,
           skip: `The agent decided not to message ${s.sender} right now`,
           no_reply: `No reply generated for ${s.sender}`,
+          ban: `${s.sender} is banned — remove the ban to message them`,
         }
         setNotice({ severity: res.status === 'sent' ? 'success' : 'info', message: byStatus[res.status] })
       },
@@ -372,7 +486,7 @@ export default function CharacterDetail() {
             </TableHead>
             <TableBody>
               {senders.data.map((s) => (
-                <TableRow key={s.id} sx={s.muted ? { opacity: 0.55 } : undefined}>
+                <TableRow key={s.id} sx={s.muted || s.banned ? { opacity: 0.55 } : undefined}>
                   <TableCell sx={{ fontSize: '0.74rem', wordBreak: 'break-all', fontFamily: TYPE.mono }}>
                     {s.sender}
                     {s.muted && (
@@ -380,6 +494,15 @@ export default function CharacterDetail() {
                         label="muted"
                         size="small"
                         color="warning"
+                        variant="outlined"
+                        sx={{ ml: 1, fontSize: '0.6rem', height: 18 }}
+                      />
+                    )}
+                    {s.banned && (
+                      <Chip
+                        label="banned"
+                        size="small"
+                        color="error"
                         variant="outlined"
                         sx={{ ml: 1, fontSize: '0.6rem', height: 18 }}
                       />
@@ -491,6 +614,100 @@ export default function CharacterDetail() {
         </TableContainer>
       )}
 
+      <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+        Memory ({memory.data?.memory.length ?? 0})
+      </Typography>
+      <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+        <Button size="small" variant="outlined" startIcon={<NoteAddIcon />} onClick={() => setAddMemoryOpen(true)}>
+          Add memory
+        </Button>
+      </Stack>
+      {memory.isPending && <CircularProgress />}
+      {memory.isError && <ErrorBanner error={memory.error} />}
+      {memory.isSuccess && memory.data.memory.length === 0 && (
+        <EmptyState text="Nothing remembered yet. After each email the bot asks whether the exchange is worth keeping; add one yourself to seed it." />
+      )}
+      {memory.isSuccess && memory.data.memory.length > 0 && (
+        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 150 }}>When</TableCell>
+                <TableCell sx={{ width: 240 }}>About</TableCell>
+                <TableCell>Memory</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {memory.data.memory.map((m, i) => (
+                <TableRow key={`${m.at}-${i}`}>
+                  <TableCell sx={{ fontSize: '0.7rem', fontFamily: TYPE.mono }}>{formatDateTime(m.at)}</TableCell>
+                  <TableCell sx={{ fontSize: '0.74rem', wordBreak: 'break-all', fontFamily: TYPE.mono }}>
+                    {m.sender}
+                  </TableCell>
+                  <TableCell
+                    sx={{ fontSize: '0.74rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5 }}
+                  >
+                    {m.text}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+        Banned ({banned.data?.banned.length ?? 0})
+      </Typography>
+      <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+        <Button size="small" variant="outlined" color="error" startIcon={<BlockIcon />} onClick={() => setBanOpen(true)}>
+          Ban sender
+        </Button>
+      </Stack>
+      {banned.isPending && <CircularProgress />}
+      {banned.isError && <ErrorBanner error={banned.error} />}
+      {banned.isSuccess && banned.data.banned.length === 0 && (
+        <EmptyState text="No one is banned. If the AI decides an address isn't worth replying to, it can mark it __BAN__ and it lands here." />
+      )}
+      {banned.isSuccess && banned.data.banned.length > 0 && (
+        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Sender</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {banned.data.banned.map((email) => (
+                <TableRow key={email}>
+                  <TableCell sx={{ fontSize: '0.74rem', wordBreak: 'break-all', fontFamily: TYPE.mono }}>
+                    {email}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Unban — allow replies again">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        disabled={removeBan.isPending}
+                        onClick={() =>
+                          removeBan.mutate(email, {
+                            onSuccess: () => setNotice({ severity: 'success', message: `Unbanned ${email}` }),
+                            onError: (e) => setNotice({ severity: 'error', message: e.message }),
+                          })
+                        }
+                      >
+                        <RestoreIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
       <AddSenderDialog
         open={addOpen}
         pending={addSender.isPending}
@@ -531,6 +748,39 @@ export default function CharacterDetail() {
       />
 
       <ComposeDialog charName={name} open={composeOpen} onClose={() => setComposeOpen(false)} onResult={setNotice} />
+
+      <AddMemoryDialog
+        open={addMemoryOpen}
+        pending={addMemory.isPending}
+        onClose={() => setAddMemoryOpen(false)}
+        onAdd={(sender, content) =>
+          addMemory.mutate(
+            { sender, content },
+            {
+              onSuccess: () => {
+                setAddMemoryOpen(false)
+                setNotice({ severity: 'success', message: `Remembered something about ${sender}` })
+              },
+              onError: (e) => setNotice({ severity: 'error', message: e.message }),
+            },
+          )
+        }
+      />
+
+      <BanSenderDialog
+        open={banOpen}
+        pending={addBan.isPending}
+        onClose={() => setBanOpen(false)}
+        onBan={(email) =>
+          addBan.mutate(email, {
+            onSuccess: () => {
+              setBanOpen(false)
+              setNotice({ severity: 'success', message: `Banned ${email}` })
+            },
+            onError: (e) => setNotice({ severity: 'error', message: e.message }),
+          })
+        }
+      />
 
       <Snackbar
         open={!!notice}

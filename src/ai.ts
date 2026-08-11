@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlink
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { Character } from "./character.ts";
 import { normalizeSender } from "./sender.ts";
+import { memoryBlock } from "./memory.ts";
 
 /** Shared DeepSeek client — the API key is global in .env, used by all characters. */
 export const client = new OpenAI({
@@ -79,7 +80,7 @@ export async function chatWithHistory(
     const history = loadHistory(char, sender);
 
     const messages: ChatCompletionMessageParam[] = [
-        { role: "system", content: char.prompt },
+        { role: "system", content: char.prompt + memoryBlock(char) },
         ...history,
         { role: "user", content: withCurrentTime(content) },
     ];

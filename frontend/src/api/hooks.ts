@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client.ts'
+import { encodeSenderId } from '../utils.ts'
 
 export const qk = {
   status: ['status'] as const,
@@ -8,6 +9,8 @@ export const qk = {
   senders: (name: string) => ['senders', name] as const,
   history: (name: string, senderId: string) => ['history', name, senderId] as const,
   tasks: (name: string) => ['tasks', name] as const,
+  memory: (name: string) => ['memory', name] as const,
+  banned: (name: string) => ['banned', name] as const,
 }
 
 export interface StatusChar {
@@ -32,12 +35,21 @@ export interface SenderSummary {
   muted: boolean
   /** ISO time of the last proactive message actually sent, or null. */
   lastProactive: string | null
+  /** This sender is permanently banned — the character never replies to them. */
+  banned: boolean
 }
 
 export interface ProactiveTriggerResult {
   ok: boolean
   sender: string
-  status: 'skip' | 'later' | 'sent' | 'no_reply'
+  status: 'skip' | 'later' | 'sent' | 'no_reply' | 'ban'
+}
+
+/** One line of a character's long-term memory (memory.md). */
+export interface MemoryEntry {
+  at: string
+  sender: string
+  text: string
 }
 
 export interface CharacterInfo {
@@ -230,6 +242,73 @@ export function useTriggerProactive(name: string) {
         { method: 'POST' },
       ),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+export function useMemory(name: string) {
+  return useQuery({
+    queryKey: qk.memory(name),
+    queryFn: () =>
+      apiFetch<{ memory: MemoryEntry[] }>(`/characters/${encodeURIComponent(name)}/memory`),
+    enabled: !!name,
+  })
+}
+
+/** Manually add a long-term memory entry, tagged with which person it's about. */
+export function useAddMemory(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: { sender: string; content: string }) =>
+      apiFetch<{ ok: boolean; at: string; sender: string }>(
+        `/characters/${encodeURIComponent(name)}/memory`,
+        { method: 'POST', body: JSON.stringify(args) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.memory(name) })
+    },
+  })
+}
+
+export function useBanned(name: string) {
+  return useQuery({
+    queryKey: qk.banned(name),
+    queryFn: () =>
+      apiFetch<{ banned: string[] }>(`/characters/${encodeURIComponent(name)}/banned`),
+    enabled: !!name,
+  })
+}
+
+/** Permanently stop replying to a sender (adds to the character's ban list). */
+export function useAddBan(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sender: string) =>
+      apiFetch<{ ok: boolean; sender: string; banned: string[] }>(
+        `/characters/${encodeURIComponent(name)}/banned`,
+        { method: 'POST', body: JSON.stringify({ sender }) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.banned(name) })
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Lift a ban on a sender (they can be replied to again). */
+export function useRemoveBan(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sender: string) =>
+      apiFetch<{ ok: boolean; banned: string[] }>(
+        `/characters/${encodeURIComponent(name)}/banned/${encodeURIComponent(encodeSenderId(sender))}`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.banned(name) })
       qc.invalidateQueries({ queryKey: qk.senders(name) })
       qc.invalidateQueries({ queryKey: qk.status })
     },

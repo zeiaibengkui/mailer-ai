@@ -3,6 +3,8 @@ import { loadCharacters, type Character } from "./character.ts";
 import { markHandled, onReceive } from "./mail.ts";
 import { chatWithHistory } from "./ai.ts";
 import { processAIReply } from "./replyHandler.ts";
+import { rememberExchange } from "./memory.ts";
+import { isBanned } from "./ban.ts";
 import { CRONTAB_CHECK_MS, processCrontab } from "./scheduler.ts";
 import { startProactive } from "./proactive.ts";
 import { startApi } from "./api.ts";
@@ -19,13 +21,27 @@ async function runReceiveLoop(char: Character) {
             console.log(
                 `[${char.name}] Received: "${msg.subject}" from ${msg.from} at ${msg.date}`,
             );
-            const text = await chatWithHistory(
-                char,
-                msg.from,
-                `Date: ${msg.date}\nSubject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`,
-            );
+
+            // Permanently banned senders are never answered: mark handled, no AI call.
+            if (isBanned(char, msg.from)) {
+                console.log(`[${char.name}] Skipped banned sender ${msg.from}`);
+                await markHandled(char, msg.uid);
+                continue;
+            }
+
+            const emailText = `Date: ${msg.date}\nSubject: ${msg.subject}\nFrom: ${msg.from}\n\n${msg.text}`;
+            const text = await chatWithHistory(char, msg.from, emailText);
 
             await processAIReply(char, msg.from, text);
+
+            // After every handled email, ask the memory keeper whether to remember it.
+            // Its own try/catch: a failed extraction must never re-open the email.
+            try {
+                await rememberExchange(char, msg.from, emailText, text);
+            } catch (e) {
+                console.error(`[${char.name}] memory write failed:`, e);
+            }
+
             await markHandled(char, msg.uid);
         } catch (e) {
             // Keep other characters alive; the failing email stays unseen and is retried.

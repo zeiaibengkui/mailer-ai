@@ -1,6 +1,7 @@
 import { sendEmail } from "./mail.ts";
 import { addTask, handleLater } from "./scheduler.ts";
 import { extractReply } from "./ai.ts";
+import { addBan } from "./ban.ts";
 import { randomUUID } from "crypto";
 import type { Character } from "./character.ts";
 
@@ -8,10 +9,16 @@ export async function processAIReply(
     char: Character,
     sender: string,
     text: string,
-): Promise<"skip" | "later" | "sent" | "no_reply"> {
+): Promise<"skip" | "later" | "sent" | "no_reply" | "ban"> {
     if (text.includes("__SKIP__")) {
         console.log(`[${char.name}] Skipped reply to ${sender}`);
         return "skip";
+    }
+
+    if (text.includes("__BAN__")) {
+        addBan(char, sender);
+        console.log(`[${char.name}] Banned ${sender}`);
+        return "ban";
     }
 
     if (text.includes("__LATER__")) {

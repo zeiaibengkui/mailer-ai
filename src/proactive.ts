@@ -2,6 +2,8 @@ import { readdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { processAIReply } from "./replyHandler.ts";
 import type { ChatCompletionMessageParam } from "openai/resources";
 import { loadHistory, client, saveHistory, withCurrentTime } from "./ai.ts";
+import { memoryBlock } from "./memory.ts";
+import { isBanned } from "./ban.ts";
 import type { Character } from "./character.ts";
 
 /** Shared proactive prompts (prompts/proactive.md): wake-up (system) + trigger (user), split by a `---` line. */
@@ -116,6 +118,9 @@ export async function processProactive(char: Character) {
         // Muted senders are never proactively messaged (but still get replies).
         if (isMutedValue(tracker[sender])) continue;
 
+        // Banned senders get nothing at all — no replies, no proactive messages.
+        if (isBanned(char, sender)) continue;
+
         const lastTime = lastProactiveOf(tracker[sender]) ? new Date(lastProactiveOf(tracker[sender])!).getTime() : 0;
         if (Date.now() - lastTime < char.conf.bot.proactive_min_gap_ms) continue;
 
@@ -151,7 +156,7 @@ async function proactiveChatInner(char: Character, sender: string): Promise<stri
 
     const { sys, user } = proactivePrompts();
     const messages: ChatCompletionMessageParam[] = [
-        { role: "system", content: char.prompt + "\n\n" + sys },
+        { role: "system", content: char.prompt + memoryBlock(char) + "\n\n" + sys },
         ...history,
         {
             role: "user",
@@ -179,6 +184,7 @@ async function proactiveChatInner(char: Character, sender: string): Promise<stri
  * `__SKIP__`/`__LATER__`, and the tracker is only bumped when something is sent.
  */
 export async function triggerProactive(char: Character, sender: string): Promise<string> {
+    if (isBanned(char, sender)) return "ban";
     const text = await proactiveChatInner(char, sender);
     if (!text) return "skip";
     const status = await processAIReply(char, sender, text);

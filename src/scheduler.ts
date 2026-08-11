@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { chatWithHistory } from "./ai.ts";
 import { processAIReply } from "./replyHandler.ts";
+import { isBanned } from "./ban.ts";
 import type { Character } from "./character.ts";
 
 function crontabFile(char: Character): string {
@@ -56,6 +57,11 @@ export async function processCrontab(char: Character) {
     for (const task of due) {
         try {
             removeTask(char, task.id);
+            // Banned senders are never messaged, even for scheduled check-ins.
+            if (isBanned(char, task.sender)) {
+                console.log(`[${char.name}] Skipped scheduled reply to banned sender ${task.sender}`);
+                continue;
+            }
             const text = await chatWithHistory(char, task.sender, crontabPrompt());
 
             await processAIReply(char, task.sender, text);

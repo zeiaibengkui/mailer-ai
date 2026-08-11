@@ -15,6 +15,8 @@ import { loadTasks, removeTask } from "./scheduler.ts";
 import { clearTrackerEntry, setMuted, senderProactiveStates, triggerProactive } from "./proactive.ts";
 import { sendEmail } from "./mail.ts";
 import { normalizeSender } from "./sender.ts";
+import { appendMemory, loadMemoryEntries } from "./memory.ts";
+import { addBan, isBanned, listBanned, removeBan } from "./ban.ts";
 
 const STARTED_AT = Date.now();
 
@@ -45,14 +47,15 @@ export function startApi(chars: Character[]) {
 
     const findChar = (name: string) => chars.find((c) => c.name === name);
 
-    // Sender summaries enriched with per-sender proactive state (muted + last-proactive),
-    // so the dashboard can render mute toggles and "last proactively messaged" info.
+    // Sender summaries enriched with per-sender proactive state (muted + last-proactive)
+    // and ban state, so the dashboard can render mute toggles and ban chips.
     const sendersDetailed = (ch: Character) => {
         const states = senderProactiveStates(ch);
         return listSenders(ch).map((s) => ({
             ...s,
             muted: states[s.sender]?.muted ?? false,
             lastProactive: states[s.sender]?.lastProactive ?? null,
+            banned: isBanned(ch, s.sender),
         }));
     };
 
@@ -193,6 +196,51 @@ export function startApi(chars: Character[]) {
         history.push({ role: "assistant", content: `[manual] ${subject}\n\n${text}` });
         saveHistory(ch, to, history);
         return c.json({ ok: true, to, subject });
+    });
+
+    // Long-term memory (per-character memory.md): view entries (newest first) or add one manually.
+    app.get("/characters/:name/memory", (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        return c.json({ memory: loadMemoryEntries(ch).reverse() });
+    });
+
+    app.post("/characters/:name/memory", async (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        const body = await c.req.json().catch(() => null);
+        const sender = normalizeSender(typeof body?.sender === "string" ? body.sender : "");
+        const content = typeof body?.content === "string" ? body.content.trim() : "";
+        if (!sender || !content) {
+            return c.json({ error: "body requires non-empty `sender` and `content` strings" }, 400);
+        }
+        const entry = appendMemory(ch, sender, content);
+        return c.json({ ok: true, at: entry.at, sender: entry.sender });
+    });
+
+    // Ban list: senders the character will permanently never reply to.
+    app.get("/characters/:name/banned", (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        return c.json({ banned: listBanned(ch) });
+    });
+
+    app.post("/characters/:name/banned", async (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        const body = await c.req.json().catch(() => null);
+        const sender = normalizeSender(typeof body?.sender === "string" ? body.sender : "");
+        if (!sender) return c.json({ error: "body requires a non-empty `sender` string" }, 400);
+        const added = addBan(ch, sender);
+        return c.json({ ok: true, sender: added, banned: listBanned(ch) });
+    });
+
+    app.delete("/characters/:name/banned/:senderId", (c) => {
+        const ch = findChar(c.req.param("name"));
+        if (!ch) return c.json({ error: "unknown character" }, 404);
+        const sender = decodeSenderId(c.req.param("senderId"));
+        removeBan(ch, sender);
+        return c.json({ ok: true, banned: listBanned(ch) });
     });
 
     serve({ fetch: app.fetch, hostname: "127.0.0.1", port }, (info) => {

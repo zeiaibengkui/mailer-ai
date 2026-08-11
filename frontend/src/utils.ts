@@ -1,3 +1,8 @@
+/** URL-safe base64 of a sender email — matches the backend's encodeSenderId (no padding). */
+export function encodeSenderId(sender: string): string {
+  return btoa(sender).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 export function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400)
   const h = Math.floor((seconds % 86400) / 3600)
