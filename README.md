@@ -94,7 +94,7 @@ Full reference: [`docs/api.md`](docs/api.md). The bot exposes a JSON API on `127
 | Var | Description |
 |-----|-------------|
 | `API_PORT` | Port to listen on (default `3000`) |
-| `API_KEY` | Auth is always on: every request needs `Authorization: Bearer <API_KEY>`. Set a stable key here, otherwise a random one is generated at startup and printed to the log. |
+| `API_KEY` | **Required** — the bot exits at startup if missing. Generate with `openssl rand -hex 24`. Auth is always on: every request needs `Authorization: Bearer <API_KEY>`. |
 
 Sender `id`s in URLs are the sender string encoded as URL-safe base64 (the `/characters/:name/senders` response includes both `id` and the decoded `sender`).
 
@@ -124,6 +124,19 @@ curl -X POST localhost:3000/characters/asaperson/messages \
   -H 'content-type: application/json' \
   -d '{"to":"friend@example.com","subject":"hi","body":"whats up"}'
 ```
+
+## Frontend (optional)
+
+A MUI control dashboard lives in `frontend/` (React + Vite + TanStack Query). It talks to the bot through a Vite dev proxy, so the API stays bound to `127.0.0.1`.
+
+```bash
+pnpm --dir frontend install
+pnpm --dir frontend dev        # http://localhost:5173
+```
+
+First visit: open **Settings**, paste the `API_KEY` from the bot's `.env`, hit *Test connection*. Then the Dashboard shows uptime and all characters; each character page lists senders, lets you view conversation history, add/delete senders, cancel scheduled tasks, and send emails manually.
+
+The frontend expects the bot's API on `127.0.0.1:3000` (default `API_PORT`). Build for production with `pnpm --dir frontend build`.
 
 ## How It Works
 

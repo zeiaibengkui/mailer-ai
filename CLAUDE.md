@@ -12,7 +12,7 @@ Mailer AI is an always-on email auto-reply bot that runs **multiple independent 
 - **Register a contact**: `pnpm add-sender <character> <email> [more...]` — creates an empty history file for that sender under the character's `senders/` dir so the proactive loop will message them.
 - **Install**: `pnpm install`
 - **Typecheck**: `npx tsc --noEmit` (tsconfig has `noEmit: true`; there is no build step).
-- **Control API**: `src/api.ts` starts a Hono server on `127.0.0.1:API_PORT` (default 3000) with always-on `Bearer` auth — `API_KEY` if set, else a random key generated and logged at startup. See README "REST Control API" for the endpoint table. Sender `id`s in API URLs are URL-safe base64 (via `encodeSenderId`/`decodeSenderId` in `ai.ts`), while on-disk filenames use standard base64.
+- **Control API**: `src/api.ts` starts a Hono server on `127.0.0.1:API_PORT` (default 3000) with always-on `Bearer` auth. `API_KEY` in `.env` is **required** (startup exits without it; the key is never logged). See README "REST Control API" for the endpoint table. Sender `id`s in API URLs are URL-safe base64 (via `encodeSenderId`/`decodeSenderId` in `ai.ts`), while on-disk filenames use standard base64.
 - **Tests**: none. `pnpm test` just prints an error. Verify changes by running the bot and watching logs.
 
 ## Architecture

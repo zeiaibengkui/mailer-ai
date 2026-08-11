@@ -5,7 +5,7 @@ The bot exposes a JSON API on `127.0.0.1` while `pnpm start` is running. It lets
 ## Configuration (`.env`)
 
 - `API_PORT` — port to listen on (default `3000`).
-- `API_KEY` — optional. Auth is **always enforced**: every request needs `Authorization: Bearer <API_KEY>`. If you don't set `API_KEY`, the bot generates a random key at startup and prints it to the log (the key changes on every restart — set `API_KEY` in `.env` to pin a stable one).
+- `API_KEY` — **required**; the bot refuses to start without it. Generate one with `openssl rand -hex 24`. Auth is always enforced: every request needs `Authorization: Bearer <API_KEY>`. The key is stable across restarts.
 
 The server binds to `127.0.0.1` only — it is not reachable from the network.
 
@@ -107,7 +107,7 @@ Responds `200 { "ok": true, "to": "...", "subject": "..." }`. On SMTP failure it
 
 ## Examples
 
-Every request needs `Authorization: Bearer <API_KEY>` — set `API_KEY` in `.env`, or copy the generated key from the startup log.
+Every request needs `Authorization: Bearer <API_KEY>` — set `API_KEY` in `.env` (required; the bot won't start without it).
 
 ```bash
 AUTH='Authorization: Bearer <API_KEY>'

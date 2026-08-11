@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { randomBytes } from "crypto";
 import type { Character } from "./character.ts";
 import {
     listSenders,
@@ -21,10 +20,14 @@ export function startApi(chars: Character[]) {
     const app = new Hono();
     const port = Number(process.env.API_PORT) || 3000;
 
-    // Auth is always enforced. Set API_KEY in .env for a stable key; otherwise a
-    // random per-session key is generated and printed to the log at startup.
-    const configuredKey = process.env.API_KEY;
-    const apiKey = configuredKey ?? randomBytes(24).toString("hex");
+    // Auth is mandatory. Require a stable key from .env rather than generating one:
+    // a generated key would have to be printed to the log (a secret in logs) and
+    // would rotate on every restart.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        console.error("[api] API_KEY is not set — add it to .env (e.g. `openssl rand -hex 24`) and restart.");
+        process.exit(1);
+    }
 
     app.use("*", async (c, next) => {
         const auth = c.req.header("Authorization");
@@ -145,11 +148,6 @@ export function startApi(chars: Character[]) {
         saveHistory(ch, to, history);
         return c.json({ ok: true, to, subject });
     });
-
-    if (!configuredKey) {
-        console.log(`[api] API_KEY not set — generated key for this session: ${apiKey}`);
-        console.log("[api] set API_KEY in .env to pin a stable key");
-    }
 
     serve({ fetch: app.fetch, hostname: "127.0.0.1", port }, (info) => {
         console.log(`API listening on http://${info.address}:${info.port} (localhost only)`);
