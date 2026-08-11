@@ -61,6 +61,13 @@ export interface CommandResult {
   reply: string
 }
 
+/** The Jesus supervisor's answer plus the tool calls it made. */
+export interface JesusResult {
+  ok: boolean
+  reply: string
+  steps: { name: string; args: string }[]
+}
+
 export interface CharacterInfo {
   name: string
   email: string
@@ -415,6 +422,16 @@ export function useAskAgent(name: string) {
         `/characters/${encodeURIComponent(name)}/ask`,
         { method: 'POST', body: JSON.stringify(args) },
       ),
+  })
+}
+
+/** Run the Jesus supervisor on a plain-language command (it drives tool calls itself). */
+export function useJesus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (command: string) =>
+      apiFetch<JesusResult>('/jesus', { method: 'POST', body: JSON.stringify({ command }) }),
+    onSuccess: () => qc.invalidateQueries(),
   })
 }
 
