@@ -7,7 +7,7 @@ import { rememberExchange } from "./memory.ts";
 import { isBanned } from "./ban.ts";
 import { CRONTAB_CHECK_MS, processCrontab } from "./scheduler.ts";
 import { startProactive } from "./proactive.ts";
-import { startApi } from "./api.ts";
+import { startApi } from "./api/index.ts";
 import "./utils/checkLock.mts";
 
 function sleep(ms: number) {
