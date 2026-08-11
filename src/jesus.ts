@@ -227,6 +227,93 @@ export interface JesusResult {
     steps: { name: string; args: string }[];
 }
 
+/** Streaming event emitted by the Jesus supervisor while it works. */
+export type JesusStreamChunk =
+    | { type: "thinking"; text: string }
+    | { type: "delta"; text: string }
+    | { type: "tool"; name: string; args: string };
+
+/**
+ * Streaming version of runJesus: yields thinking tokens, reply tokens, and tool calls
+ * as they happen, so a client can render the run live. The loop executes tool calls
+ * (feeding results back) until the model stops calling tools.
+ */
+export async function* runJesusStream(
+    chars: Character[],
+    command: string,
+): AsyncGenerator<JesusStreamChunk> {
+    const messages: any[] = [
+        { role: "system", content: JESUS_SYSTEM },
+        { role: "user", content: command },
+    ];
+
+    for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+        const stream = await client.chat.completions.create({
+            model: MODEL,
+            messages,
+            tools: tools.map((t) => t.def),
+            stream: true,
+        });
+
+        // Tool calls arrive as deltas; accumulate them by index.
+        const toolCalls: { index: number; id?: string; name?: string; args?: string }[] = [];
+        let content = "";
+
+        for await (const chunk of stream) {
+            const delta: any = chunk.choices?.[0]?.delta;
+            if (!delta) continue;
+            if (delta.reasoning_content) {
+                yield { type: "thinking", text: delta.reasoning_content };
+            }
+            if (delta.content) {
+                content += delta.content;
+                yield { type: "delta", text: delta.content };
+            }
+            if (delta.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                    const idx = tc.index ?? 0;
+                    toolCalls[idx] = toolCalls[idx] ?? { index: idx };
+                    if (tc.id) toolCalls[idx].id = tc.id;
+                    if (tc.function?.name) toolCalls[idx].name = (toolCalls[idx].name ?? "") + tc.function.name;
+                    if (tc.function?.arguments) toolCalls[idx].args = (toolCalls[idx].args ?? "") + tc.function.arguments;
+                }
+            }
+        }
+
+        if (toolCalls.length > 0) {
+            messages.push({
+                role: "assistant",
+                content: content || null,
+                tool_calls: toolCalls.map((tc) => ({
+                    id: tc.id,
+                    type: "function",
+                    function: { name: tc.name, arguments: tc.args ?? "" },
+                })),
+            });
+            for (const tc of toolCalls) {
+                yield { type: "tool", name: tc.name ?? "?", args: tc.args ?? "" };
+                let result: unknown;
+                try {
+                    const t = tools.find((x) => (x.def as any).function.name === tc.name);
+                    let args: Record<string, any> = {};
+                    try {
+                        args = JSON.parse(tc.args ?? "{}");
+                    } catch {
+                        args = {};
+                    }
+                    result = t ? await t.fn(args, chars) : { error: `unknown tool ${tc.name}` };
+                } catch (e) {
+                    result = { error: e instanceof Error ? e.message : String(e) };
+                }
+                messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
+            }
+            continue;
+        }
+
+        return; // final answer was fully streamed as deltas
+    }
+}
+
 /**
  * Run the Jesus supervisor on a user command. The model calls tools (native function
  * calling) until it produces a final answer, then we return that answer plus a log of

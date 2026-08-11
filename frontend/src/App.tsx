@@ -12,6 +12,7 @@ import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import LightModeIcon from '@mui/icons-material/LightMode'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import GroupsIcon from '@mui/icons-material/Groups'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -20,6 +21,7 @@ import { Monogram } from './components/Monogram.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import Characters from './pages/Characters.tsx'
 import CharacterDetail from './pages/CharacterDetail.tsx'
+import Jesus from './pages/Jesus.tsx'
 import Settings from './pages/Settings.tsx'
 
 const DRAWER_WIDTH = 220
@@ -27,6 +29,7 @@ const DRAWER_WIDTH = 220
 const NAV = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { to: '/characters', label: 'Characters', icon: <GroupsIcon /> },
+  { to: '/jesus', label: 'Jesus', icon: <AutoAwesomeIcon /> },
   { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
 ]
 
@@ -98,6 +101,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/characters" element={<Characters />} />
           <Route path="/characters/:name" element={<CharacterDetail />} />
+          <Route path="/jesus" element={<Jesus />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Box>

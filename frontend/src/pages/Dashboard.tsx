@@ -7,7 +7,6 @@ import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
 import CircularProgress from '@mui/material/CircularProgress'
 import Grid from '@mui/material/Grid'
-import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -16,16 +15,13 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import {
   useCharacters,
   useClearAllCharactersHistory,
   useClearAllCharactersMemory,
-  useJesus,
   useStatus,
-  type JesusResult,
   type SenderSummary,
 } from '../api/hooks.ts'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
@@ -33,7 +29,6 @@ import { ErrorBanner } from '../components/ErrorBanner.tsx'
 import { Lamp } from '../components/Lamp.tsx'
 import { Monogram } from '../components/Monogram.tsx'
 import { TYPE } from '../theme.ts'
-import TextField from '@mui/material/TextField'
 import { formatUptime } from '../utils.ts'
 
 export default function Dashboard() {
@@ -42,11 +37,8 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const clearAllHist = useClearAllCharactersHistory()
   const clearAllMem = useClearAllCharactersMemory()
-  const jesus = useJesus()
   const [clearHistoriesOpen, setClearHistoriesOpen] = useState(false)
   const [clearMemoryOpen, setClearMemoryOpen] = useState(false)
-  const [jesusCmd, setJesusCmd] = useState('')
-  const [jesusResult, setJesusResult] = useState<JesusResult | null>(null)
 
   if (status.isPending || chars.isPending) return <CircularProgress />
   if (status.isError) return <ErrorBanner error={status.error} />
@@ -105,61 +97,6 @@ export default function Dashboard() {
           Clear all memory
         </Button>
       </Stack>
-
-      <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-          <AutoAwesomeIcon fontSize="small" color="secondary" />
-          <Typography variant="overline" sx={{ color: 'text.secondary' }}>
-            Jesus — supervisor
-          </Typography>
-        </Stack>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-          <TextField
-            size="small"
-            fullWidth
-            multiline
-            minRows={2}
-            placeholder={'e.g. 总结一下现在的剧情 / 让 beggar 记住 tweakor 是可疑分子 / 让 asaperson 给 tweakor 写一封结盟邮件'}
-            value={jesusCmd}
-            onChange={(e) => setJesusCmd(e.target.value)}
-          />
-          <Button
-            variant="contained"
-            color="secondary"
-            disabled={!jesusCmd.trim() || jesus.isPending}
-            onClick={() => {
-              setJesusResult(null)
-              jesus.mutate(jesusCmd.trim(), {
-                onSuccess: (r) => {
-                  setJesusResult(r)
-                  setJesusCmd('')
-                },
-              })
-            }}
-          >
-            {jesus.isPending ? 'Summoning…' : 'Run'}
-          </Button>
-        </Stack>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
-          It can read/tamper conversations, edit memories, ask or command the characters (a command may send a real email), and summarize the plot.
-        </Typography>
-        {jesus.isPending && <CircularProgress size={18} sx={{ mt: 1 }} />}
-        {jesusResult && (
-          <Box sx={{ mt: 1.5 }}>
-            {jesusResult.steps.length > 0 && (
-              <Typography
-                variant="caption"
-                sx={{ color: 'text.secondary', display: 'block', mb: 0.5, fontFamily: TYPE.mono, wordBreak: 'break-all' }}
-              >
-                tools: {jesusResult.steps.map((s) => `${s.name}(${s.args.slice(0, 40)})`).join('  →  ')}
-              </Typography>
-            )}
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
-              {jesusResult.reply}
-            </Typography>
-          </Box>
-        )}
-      </Paper>
 
       <Grid container spacing={2.5}>
         {chars.data.map((c, i) => {
