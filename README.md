@@ -75,12 +75,13 @@ secure = true
 user = "you@163.com"
 pass = "your-password"
 
-[bot]                          # all optional, defaults shown
+[bot]                          # all optional; leave a model empty/absent to use the default
 fetch_interval_ms = 30000
 proactive_interval_ms = 300000
 proactive_min_gap_ms = 3600000
-model = "deepseek-v4-flash"
-proactive_model = "deepseek-v4-flash"
+model = "deepseek-reasoner"    # replies, scheduled replies, memory extraction
+proactive_model = "deepseek-reasoner"  # proactive messages
+thinking_model = "deepseek-reasoner"   # agent console ask/command
 ```
 
 Add a new character by creating `characters/<name>/prompt.md` + `conf.toml`. The bot picks it up on next start.

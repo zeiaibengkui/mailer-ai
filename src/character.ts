@@ -68,9 +68,11 @@ function normalizeConf(raw: Record<string, any>): CharacterConf {
             fetch_interval_ms: raw.bot?.fetch_interval_ms ?? 30000,
             proactive_interval_ms: raw.bot?.proactive_interval_ms ?? 300000,
             proactive_min_gap_ms: raw.bot?.proactive_min_gap_ms ?? 3600000,
-            model: raw.bot?.model ?? "deepseek-chat",
-            proactive_model: raw.bot?.proactive_model ?? "deepseek-v4-flash",
-            thinking_model: raw.bot?.thinking_model ?? "deepseek-reasoner",
+            // Leave a model empty/absent to use the default. All defaults are the reasoning
+            // model so every generation path thinks; override per-character in conf.toml.
+            model: raw.bot?.model || "deepseek-reasoner",
+            proactive_model: raw.bot?.proactive_model || "deepseek-reasoner",
+            thinking_model: raw.bot?.thinking_model || "deepseek-reasoner",
         },
     };
 }
