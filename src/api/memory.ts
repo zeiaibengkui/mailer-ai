@@ -1,4 +1,4 @@
-import { appendMemory, loadMemoryEntries } from "../memory.ts";
+import { appendMemory, clearMemory, loadMemoryEntries, removeMemoryEntry } from "../memory.ts";
 import { normalizeSender } from "../sender.ts";
 import { app } from "./app.ts";
 
@@ -20,4 +20,20 @@ app.post("/characters/:name/memory", async (c) => {
     }
     const entry = appendMemory(ch, sender, content);
     return c.json({ ok: true, at: entry.at, sender: entry.sender });
+});
+
+// Remove one memory entry (identified by its `at` timestamp).
+app.delete("/characters/:name/memory/:at", (c) => {
+    const ch = c.get("findChar")(c.req.param("name"));
+    if (!ch) return c.json({ error: "unknown character" }, 404);
+    const removed = removeMemoryEntry(ch, c.req.param("at"));
+    return c.json({ ok: true, removed });
+});
+
+// Wipe all memory for a character.
+app.delete("/characters/:name/memory", (c) => {
+    const ch = c.get("findChar")(c.req.param("name"));
+    if (!ch) return c.json({ error: "unknown character" }, 404);
+    clearMemory(ch);
+    return c.json({ ok: true });
 });

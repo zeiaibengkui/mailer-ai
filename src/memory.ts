@@ -47,6 +47,25 @@ export function loadMemoryEntries(char: Character): MemoryEntry[] {
     return entries;
 }
 
+/** Remove the memory entry with the given `at` timestamp. Returns false if none matched. */
+export function removeMemoryEntry(char: Character, at: string): boolean {
+    const entries = loadMemoryEntries(char);
+    const remaining = entries.filter((e) => e.at !== at);
+    if (remaining.length === entries.length) return false;
+    mkdirSync(char.dir, { recursive: true });
+    writeFileSync(
+        memoryFile(char),
+        remaining.map((e) => `- [${e.at}] (${e.sender}) ${e.text}\n`).join(""),
+    );
+    return true;
+}
+
+/** Wipe all of a character's long-term memory. */
+export function clearMemory(char: Character) {
+    mkdirSync(char.dir, { recursive: true });
+    writeFileSync(memoryFile(char), "");
+}
+
 /** Append one memory entry, tagged with which person it's about. */
 export function appendMemory(char: Character, sender: string, text: string): MemoryEntry {
     const entry: MemoryEntry = {

@@ -281,6 +281,35 @@ export function useAddMemory(name: string) {
   })
 }
 
+/** Remove one memory entry by its `at` timestamp. */
+export function useDeleteMemory(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (at: string) =>
+      apiFetch<{ ok: boolean; removed: boolean }>(
+        `/characters/${encodeURIComponent(name)}/memory/${encodeURIComponent(at)}`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.memory(name) })
+    },
+  })
+}
+
+/** Wipe all of a character's memory. */
+export function useClearMemory(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ ok: boolean }>(`/characters/${encodeURIComponent(name)}/memory`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.memory(name) })
+    },
+  })
+}
+
 export function useBanned(name: string) {
   return useQuery({
     queryKey: qk.banned(name),
@@ -320,6 +349,24 @@ export function useAppendHistory(name: string) {
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: qk.history(name, v.senderId) })
       qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Wipe every conversation for the character, keeping all senders (lines) registered. */
+export function useClearAllHistory(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ ok: boolean; cleared: number }>(
+        `/characters/${encodeURIComponent(name)}/history`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['history', name] })
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.characters })
       qc.invalidateQueries({ queryKey: qk.status })
     },
   })

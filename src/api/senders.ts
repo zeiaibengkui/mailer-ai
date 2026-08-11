@@ -78,6 +78,18 @@ app.post("/characters/:name/senders/:senderId/history", async (c) => {
     return c.json({ ok: true, sender, historyLength: history.length });
 });
 
+// Wipe every conversation for this character, keeping all senders (lines) registered.
+app.delete("/characters/:name/history", (c) => {
+    const ch = c.get("findChar")(c.req.param("name"));
+    if (!ch) return c.json({ error: "unknown character" }, 404);
+    let cleared = 0;
+    for (const s of listSenders(ch)) {
+        saveHistory(ch, s.sender, []);
+        cleared++;
+    }
+    return c.json({ ok: true, cleared });
+});
+
 // Clear a conversation (keep the sender registered).
 app.delete("/characters/:name/senders/:senderId/history", (c) => {
     const ch = c.get("findChar")(c.req.param("name"));

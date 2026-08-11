@@ -26,7 +26,9 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
 import BlockIcon from '@mui/icons-material/Block'
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import DeleteIcon from '@mui/icons-material/Delete'
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import FlashOnIcon from '@mui/icons-material/FlashOn'
 import HelpIcon from '@mui/icons-material/Help'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
@@ -44,8 +46,11 @@ import {
   useAskAgent,
   useBanned,
   useCharacter,
+  useClearAllHistory,
   useClearHistory,
+  useClearMemory,
   useCommandAgent,
+  useDeleteMemory,
   useDeleteSender,
   useDeleteTask,
   useMemory,
@@ -566,6 +571,9 @@ export default function CharacterDetail() {
   const triggerProactive = useTriggerProactive(name)
   const memory = useMemory(name)
   const addMemory = useAddMemory(name)
+  const deleteMemory = useDeleteMemory(name)
+  const clearMemory = useClearMemory(name)
+  const clearAllHistory = useClearAllHistory(name)
   const banned = useBanned(name)
   const addBan = useAddBan(name)
   const removeBan = useRemoveBan(name)
@@ -577,6 +585,8 @@ export default function CharacterDetail() {
   >(null)
   const [composeOpen, setComposeOpen] = useState(false)
   const [addMemoryOpen, setAddMemoryOpen] = useState(false)
+  const [clearMemoryOpen, setClearMemoryOpen] = useState(false)
+  const [clearHistoriesOpen, setClearHistoriesOpen] = useState(false)
   const [banOpen, setBanOpen] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [busySender, setBusySender] = useState<string | null>(null)
@@ -665,12 +675,28 @@ export default function CharacterDetail() {
             </Stack>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
             Add sender
           </Button>
           <Button variant="contained" startIcon={<SendIcon />} onClick={() => setComposeOpen(true)}>
             Send email
+          </Button>
+          <Button
+            variant="outlined"
+            color="warning"
+            startIcon={<DeleteSweepIcon />}
+            onClick={() => setClearHistoriesOpen(true)}
+          >
+            Clear histories
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteForeverIcon />}
+            onClick={() => setClearMemoryOpen(true)}
+          >
+            Clear memory
           </Button>
         </Stack>
       </Stack>
@@ -847,6 +873,7 @@ export default function CharacterDetail() {
                 <TableCell sx={{ width: 150 }}>When</TableCell>
                 <TableCell sx={{ width: 240 }}>About</TableCell>
                 <TableCell>Memory</TableCell>
+                <TableCell align="right" sx={{ width: 48 }}>Del</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -861,12 +888,51 @@ export default function CharacterDetail() {
                   >
                     {m.text}
                   </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Delete this memory">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        disabled={deleteMemory.isPending}
+                        onClick={() => deleteMemory.mutate(m.at)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
       )}
+      <ConfirmDialog
+        open={clearHistoriesOpen}
+        title="Clear all histories"
+        text={`Wipe every conversation of "${detail.name}"? The senders (lines) stay registered, but all exchange history is gone. This cannot be undone.`}
+        confirmLabel="Clear"
+        loading={clearAllHistory.isPending}
+        onConfirm={() =>
+          clearAllHistory.mutate(undefined, {
+            onSuccess: () => setClearHistoriesOpen(false),
+          })
+        }
+        onClose={() => setClearHistoriesOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={clearMemoryOpen}
+        title="Clear all memory"
+        text={`Wipe every memory of "${detail.name}"? This cannot be undone.`}
+        confirmLabel="Clear"
+        loading={clearMemory.isPending}
+        onConfirm={() =>
+          clearMemory.mutate(undefined, {
+            onSuccess: () => setClearMemoryOpen(false),
+          })
+        }
+        onClose={() => setClearMemoryOpen(false)}
+      />
 
       <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
         Banned ({banned.data?.banned.length ?? 0})
