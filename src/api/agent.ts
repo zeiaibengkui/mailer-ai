@@ -1,4 +1,4 @@
-import { askAgent, chatWithHistory, listSenders } from "../ai.ts";
+import { askAgent, listSenders } from "../ai.ts";
 import { processAIReply } from "../replyHandler.ts";
 import { normalizeSender } from "../sender.ts";
 import { app } from "./app.ts";
@@ -16,8 +16,13 @@ app.post("/characters/:name/ask", async (c) => {
     if (!sender || !content) {
         return c.json({ error: "body requires non-empty `sender` and `content` strings" }, 400);
     }
+    // Same known-sender rule as /command: the ask loads that sender's history as context,
+    // so keep it to senders this character already knows (register via POST /senders first).
+    if (!listSenders(ch).some((s) => s.sender === sender)) {
+        return c.json({ error: "unknown sender for this character — add it first" }, 403);
+    }
     try {
-        const reply = await askAgent(ch, sender, content);
+        const reply = await askAgent(ch, sender, content, false, ch.conf.bot.thinking_model);
         return c.json({ ok: true, sender, reply });
     } catch (e) {
         console.error(`[${ch.name}] [api] ask failed:`, e);
@@ -43,7 +48,9 @@ app.post("/characters/:name/command", async (c) => {
         return c.json({ error: "unknown sender for this character — add it first" }, 403);
     }
     try {
-        const text = await chatWithHistory(ch, sender, command);
+        // Same save-to-history semantics as chatWithHistory, but on the thinking model so the
+        // agent reasons properly about the command instead of breezing past it.
+        const text = await askAgent(ch, sender, command, true, ch.conf.bot.thinking_model);
         const status = await processAIReply(ch, sender, text);
         return c.json({ ok: true, sender, status, reply: text });
     } catch (e) {

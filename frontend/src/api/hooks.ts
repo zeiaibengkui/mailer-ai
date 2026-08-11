@@ -308,11 +308,11 @@ export function useAddBan(name: string) {
 }
 
 /** Lift a ban on a sender (they can be replied to again). */
-/** Append a message to a sender's conversation (user = they said, assistant = the character said). */
+/** Append a message to a sender's conversation (system = instructions, user = they said, assistant = the character said). */
 export function useAppendHistory(name: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (args: { senderId: string; role: 'user' | 'assistant'; content: string }) =>
+    mutationFn: (args: { senderId: string; role: 'user' | 'assistant' | 'system'; content: string }) =>
       apiFetch<{ ok: boolean; sender: string; historyLength: number }>(
         `/characters/${encodeURIComponent(name)}/senders/${encodeURIComponent(args.senderId)}/history`,
         { method: 'POST', body: JSON.stringify({ role: args.role, content: args.content }) },

@@ -143,7 +143,7 @@ function HistoryDialog({
   const ask = useAskAgent(charName)
   const command = useCommandAgent(charName)
 
-  const [appendRole, setAppendRole] = useState<'user' | 'assistant'>('user')
+  const [appendRole, setAppendRole] = useState<'user' | 'assistant' | 'system'>('system')
   const [appendContent, setAppendContent] = useState('')
   const [clearOpen, setClearOpen] = useState(false)
   const [askContent, setAskContent] = useState('')
@@ -245,9 +245,10 @@ function HistoryDialog({
               size="small"
               label="Speaker"
               value={appendRole}
-              onChange={(e) => setAppendRole(e.target.value as 'user' | 'assistant')}
-              sx={{ width: 180 }}
+              onChange={(e) => setAppendRole(e.target.value as 'user' | 'assistant' | 'system')}
+              sx={{ width: 200 }}
             >
+              <MenuItem value="system">Instructions (system)</MenuItem>
               <MenuItem value="user">They said (user)</MenuItem>
               <MenuItem value="assistant">Character said (assistant)</MenuItem>
             </TextField>

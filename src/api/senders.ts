@@ -52,19 +52,26 @@ app.delete("/characters/:name/senders/:senderId", (c) => {
     return c.json({ ok: true, sender });
 });
 
-// Tamper with a conversation: append a message (user = "they said", assistant = "the character
-// said") to steer the agent's context. The next chat/reply will see it.
+// Tamper with a conversation: append a message to steer the agent's context. `system` messages
+// are treated as authoritative instructions (the AI trusts them); `user` = "they said",
+// `assistant` = "the character said". The next chat/reply will see it.
 app.post("/characters/:name/senders/:senderId/history", async (c) => {
     const ch = c.get("findChar")(c.req.param("name"));
     if (!ch) return c.json({ error: "unknown character" }, 404);
     const body = await c.req.json().catch(() => null);
     const role = body?.role;
     const content = typeof body?.content === "string" ? body.content.trim() : "";
-    if (role !== "user" && role !== "assistant") {
-        return c.json({ error: "`role` must be 'user' or 'assistant'" }, 400);
+    if (role !== "user" && role !== "assistant" && role !== "system") {
+        return c.json({ error: "`role` must be 'user', 'assistant', or 'system'" }, 400);
     }
     if (!content) return c.json({ error: "body requires a non-empty `content` string" }, 400);
-    const sender = decodeSenderId(c.req.param("senderId"));
+    const rawId = c.req.param("senderId");
+    const sender = decodeSenderId(rawId);
+    // Defense-in-depth: the on-disk filename is base64-derived (so `..`/`/` can't escape),
+    // but reject non-canonical ids anyway so only well-formed senders are touched.
+    if (encodeSenderId(sender) !== rawId) {
+        return c.json({ error: "invalid sender id" }, 400);
+    }
     const history = loadHistory(ch, sender);
     history.push({ role, content });
     saveHistory(ch, sender, history);
@@ -75,7 +82,11 @@ app.post("/characters/:name/senders/:senderId/history", async (c) => {
 app.delete("/characters/:name/senders/:senderId/history", (c) => {
     const ch = c.get("findChar")(c.req.param("name"));
     if (!ch) return c.json({ error: "unknown character" }, 404);
-    const sender = decodeSenderId(c.req.param("senderId"));
+    const rawId = c.req.param("senderId");
+    const sender = decodeSenderId(rawId);
+    if (encodeSenderId(sender) !== rawId) {
+        return c.json({ error: "invalid sender id" }, 400);
+    }
     saveHistory(ch, sender, []);
     return c.json({ ok: true, sender });
 });

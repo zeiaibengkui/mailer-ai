@@ -25,6 +25,8 @@ export interface BotConf {
     proactive_min_gap_ms: number;
     model: string;
     proactive_model: string;
+    /** Reasoning model ("thinking mode") used by the agent console's ask/command. */
+    thinking_model: string;
 }
 
 export interface CharacterConf {
@@ -68,6 +70,7 @@ function normalizeConf(raw: Record<string, any>): CharacterConf {
             proactive_min_gap_ms: raw.bot?.proactive_min_gap_ms ?? 3600000,
             model: raw.bot?.model ?? "deepseek-chat",
             proactive_model: raw.bot?.proactive_model ?? "deepseek-v4-flash",
+            thinking_model: raw.bot?.thinking_model ?? "deepseek-reasoner",
         },
     };
 }

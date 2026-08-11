@@ -83,6 +83,7 @@ export async function askAgent(
     sender: string,
     content: string,
     save = false,
+    model?: string,
 ): Promise<string> {
     const history = loadHistory(char, sender);
 
@@ -93,7 +94,7 @@ export async function askAgent(
     ];
 
     const reply = await client.chat.completions.create({
-        model: char.conf.bot.model,
+        model: model ?? char.conf.bot.model,
         messages,
     });
 
