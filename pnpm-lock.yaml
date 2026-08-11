@@ -23,6 +23,9 @@ importers:
       openai:
         specifier: ^6.35.0
         version: 6.35.0
+      smol-toml:
+        specifier: ^1.7.1
+        version: 1.7.1
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -383,6 +386,10 @@ packages:
     resolution: {integrity: sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==}
     engines: {node: '>= 6.0.0', npm: '>= 3.0.0'}
 
+  smol-toml@1.7.1:
+    resolution: {integrity: sha512-PPlsspAZ4jbMBu5DMFhfUGDQLu/vrL4SyBROVS37x8ynnVmFIs1VPBz1Co8Xks3TvpIaZXmU85y4DrQ+UyVFoQ==}
+    engines: {node: '>= 18'}
+
   socks@2.8.8:
     resolution: {integrity: sha512-NlGELfPrgX2f1TAAcz0WawlLn+0r3FyhhCRpFFK2CemXenPYvzMWWZINv3eDNo9ucdwme7oCHRY0Jnbs4aIkog==}
     engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
@@ -724,6 +731,8 @@ snapshots:
       parseley: 0.12.1
 
   smart-buffer@4.2.0: {}
+
+  smol-toml@1.7.1: {}
 
   socks@2.8.8:
     dependencies:

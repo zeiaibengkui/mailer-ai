@@ -2,47 +2,54 @@ import nodemailer from "nodemailer";
 import { ImapFlow, type ImapFlowOptions } from "imapflow";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { simpleParser } from "mailparser";
+import type { Character } from "./character.ts";
 
-const SEEN_FILE = "data/seen.json";
+function seenFile(char: Character): string {
+    return `${char.dir}/seen.json`;
+}
 
-function getSeenUids(): Set<number> {
-    if (!existsSync(SEEN_FILE)) return new Set();
-    const data = readFileSync(SEEN_FILE, "utf-8");
+function getSeenUids(char: Character): Set<number> {
+    const file = seenFile(char);
+    if (!existsSync(file)) return new Set();
+    const data = readFileSync(file, "utf-8");
     return new Set(JSON.parse(data));
 }
 
-function saveSeenUid(uid: number) {
-    const seen = getSeenUids();
+function saveSeenUid(char: Character, uid: number) {
+    const seen = getSeenUids(char);
     seen.add(uid);
-    writeFileSync(SEEN_FILE, JSON.stringify([...seen]));
+    writeFileSync(seenFile(char), JSON.stringify([...seen]));
 }
 
-const SMTP_CONFIG = {
-    host: process.env.SMTP_HOST!,
-    port: Number(process.env.SMTP_PORT!),
-    secure: true,
-    auth: {
-        user: process.env.SMTP_USER!,
-        pass: process.env.SMTP_PASS!,
-    },
-};
+function smtpConfig(char: Character) {
+    return {
+        host: char.conf.smtp.host,
+        port: char.conf.smtp.port,
+        secure: char.conf.smtp.secure,
+        auth: {
+            user: char.conf.smtp.user,
+            pass: char.conf.smtp.pass,
+        },
+    };
+}
 
-const IMAP_CONFIG: ImapFlowOptions = {
-    host: process.env.IMAP_HOST!,
-    port: Number(process.env.IMAP_PORT!),
-    secure: true,
-    auth: {
-        user: process.env.IMAP_USER!,
-        pass: process.env.IMAP_PASS!,
-    },
-    logger: false,
-};
+function imapConfig(char: Character): ImapFlowOptions {
+    return {
+        host: char.conf.imap.host,
+        port: char.conf.imap.port,
+        secure: char.conf.imap.secure,
+        auth: {
+            user: char.conf.imap.user,
+            pass: char.conf.imap.pass,
+        },
+        logger: false,
+    };
+}
 
-export const transporter = nodemailer.createTransport(SMTP_CONFIG);
-
-export async function sendEmail(to: string, subject: string, text: string) {
+export async function sendEmail(char: Character, to: string, subject: string, text: string) {
+    const transporter = nodemailer.createTransport(smtpConfig(char));
     const info = await transporter.sendMail({
-        from: process.env.SMTP_USER!,
+        from: char.conf.smtp.user,
         to,
         subject,
         text,
@@ -50,14 +57,14 @@ export async function sendEmail(to: string, subject: string, text: string) {
     return info;
 }
 
-export async function fetchUnseenEmails() {
-    const client = new ImapFlow(IMAP_CONFIG);
+export async function fetchUnseenEmails(char: Character) {
+    const client = new ImapFlow(imapConfig(char));
     await client.connect();
 
     try {
         const lock = await client.getMailboxLock("INBOX");
         try {
-            const seenUids = getSeenUids();
+            const seenUids = getSeenUids(char);
             const messages: EmailMessage[] = [];
 
             for await (const msg of client.fetch({ seen: false }, { source: true })) {
@@ -81,8 +88,8 @@ export async function fetchUnseenEmails() {
     }
 }
 
-export async function markAsSeen(uids: number[]) {
-    const client = new ImapFlow(IMAP_CONFIG);
+export async function markAsSeen(char: Character, uids: number[]) {
+    const client = new ImapFlow(imapConfig(char));
     await client.connect();
 
     try {
@@ -98,24 +105,27 @@ export async function markAsSeen(uids: number[]) {
 }
 
 /** Mark an email as handled (server \Seen flag + local dedup) after its reply is complete. */
-export async function markHandled(uid: number) {
-    await markAsSeen([uid]);
-    saveSeenUid(uid);
+export async function markHandled(char: Character, uid: number) {
+    await markAsSeen(char, [uid]);
+    saveSeenUid(char, uid);
 }
-
-const FETCH_INTERVAL_MS = Number(process.env.FETCH_INTERVAL_MS!) || 30000;
 
 export type EmailMessage = { subject: string; from: string; text: string; uid: number; date: string };
 
-export function onReceive(): Promise<EmailMessage> {
-    return new Promise(async (resolve) => {
+export function onReceive(char: Character): Promise<EmailMessage> {
+    const fetchInterval = char.conf.bot.fetch_interval_ms;
+    return new Promise((resolve, reject) => {
         const poll = async () => {
-            const messages = await fetchUnseenEmails();
-            if (messages.length > 0) {
-                resolve(messages[0]);
-            } else {
-                process.stdout.write(`No New Emails Since ${(new Date()).toLocaleTimeString("en-US")}\r`);
-                setTimeout(poll, FETCH_INTERVAL_MS);
+            try {
+                const messages = await fetchUnseenEmails(char);
+                if (messages.length > 0) {
+                    resolve(messages[0]);
+                } else {
+                    process.stdout.write(`[${char.name}] No New Emails Since ${(new Date()).toLocaleTimeString("en-US")}\r`);
+                    setTimeout(poll, fetchInterval);
+                }
+            } catch (e) {
+                reject(e);
             }
         };
         poll();

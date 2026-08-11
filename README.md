@@ -1,9 +1,10 @@
 # Mailer AI
 
-AI-powered email auto-reply bot with catgirl personality. Uses DeepSeek to read, decide, and reply to emails via IMAP/SMTP.
+AI-powered email auto-reply bot with multiple characters/personalities. Uses DeepSeek to read, decide, and reply to emails via IMAP/SMTP. Each character has its own prompt, its own email inbox, and its own conversation history.
 
 ## Features
 
+- **Multi-character** — each `characters/<name>/` dir is an independent bot: own prompt, own IMAP/SMTP credentials, own senders history, seen/crontab/proactive state
 - **IMAP email fetching** — polls for unseen emails, decodes MIME content
 - **AI reply with context** — per-sender conversation history persisted to disk
 - **Smart decision** — AI can `__SKIP__` (spam/thanks), `__LATER__(ISO time)` (schedule), or reply immediately
@@ -18,17 +19,57 @@ pnpm install
 cp .env.example .env
 ```
 
-Fill in `.env`:
+`.env` holds the shared DeepSeek key:
 
 | Var | Description |
 |-----|-------------|
 | `DEEPSEEK_API_KEY` | DeepSeek API key |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` |
-| `SMTP_HOST` / `SMTP_PORT` | SMTP server (e.g. `smtp.163.com:465`) |
-| `SMTP_USER` / `SMTP_PASS` | SMTP credentials |
-| `IMAP_HOST` / `IMAP_PORT` | IMAP server (e.g. `imap.163.com:993`) |
-| `IMAP_USER` / `IMAP_PASS` | IMAP credentials |
-| `FETCH_INTERVAL_MS` | Poll interval (default `30000`) |
+
+Email credentials live per-character in `characters/<name>/conf.toml` (gitignored).
+
+## Characters
+
+Each personality is a directory under `characters/` with two required files:
+
+```
+characters/<name>/
+├── prompt.md            # personality / behavior rules (tracked)
+├── conf.toml            # email creds + per-character settings (gitignored)
+├── senders/             # per-sender conversation history
+├── seen.json            # seen email UIDs
+├── crontab.json         # scheduled tasks (runtime)
+└── proactive_tracker.json # last proactive message per sender
+```
+
+`conf.toml`:
+
+```toml
+[smtp]
+host = "smtp.163.com"
+port = 465
+secure = true                  # true = implicit TLS (465), false = STARTTLS (587)
+user = "you@163.com"
+pass = "your-password"
+
+[imap]
+host = "imap.163.com"
+port = 993
+secure = true
+user = "you@163.com"
+pass = "your-password"
+
+[bot]                          # all optional, defaults shown
+fetch_interval_ms = 30000
+proactive_interval_ms = 300000
+proactive_min_gap_ms = 3600000
+model = "deepseek-chat"
+proactive_model = "deepseek-v4-flash"
+```
+
+Example: Outlook.com uses IMAP `outlook.office365.com:993` (secure) and SMTP `smtp-mail.outlook.com:587` (`secure = false`, STARTTLS).
+
+Add a new character by creating `characters/<name>/prompt.md` + `conf.toml`. The bot picks it up on next start.
 
 ## Run
 
@@ -36,47 +77,28 @@ Fill in `.env`:
 pnpm start
 ```
 
-Uses `tsx watch` — auto-restarts on file changes.
+Uses `tsx watch` — auto-restarts on file changes. One receive/crontab/proactive loop set runs per character.
 
-## Add a Contact
+## Register a Contact
 
 ```bash
-pnpm add-sender "friend@example.com"
+pnpm add-sender <character> "friend@example.com"
 ```
 
-Registers an email address so the bot will start proactively messaging it on the next proactive tick (creates an empty history file in `data/senders/`).
-
-## Project Structure
-
-```
-src/
-├── main.mts          # Main loop: receive → AI → reply
-├── mail.ts           # IMAP fetch + SMTP send
-├── ai.ts             # DeepSeek client + history management + proactive chat
-├── scheduler.ts      # Crontab for delayed replies
-└── utils/
-    └── checkLock.mts # PID lock file
-
-data/
-├── prompt.txt        # System prompt (catgirl personality)
-├── .env              # Credentials (gitignored)
-├── senders/          # Per-sender conversation history
-├── crontab.json      # Scheduled tasks
-├── seen.json         # Local UID dedup
-└── app.lock          # Instance lock
-```
+Registers an email address for a character so it will start proactively messaging them on the next proactive tick (creates an empty history file in `characters/<name>/senders/`).
 
 ## How It Works
 
-1. Polls IMAP for unseen emails every `FETCH_INTERVAL_MS`
-2. Parses MIME content, deduplicates via local `seen.json`
+1. For each character, polls its IMAP inbox for unseen emails every `fetch_interval_ms`
+2. Parses MIME content, deduplicates via `characters/<name>/seen.json`
 3. Loads conversation history for the sender
-4. Calls DeepSeek with system prompt + history
+4. Calls DeepSeek with the character's `prompt.md` + history
 5. Acts on response:
    - `__SKIP__` → do nothing
    - `__LATER__(ISO time)` → schedule for later
-   - else → send reply, optionally proactive chat afterwards
+   - else → send reply
+6. Marks the email seen only after the reply is complete
 
 ## Prompt
 
-Edit `data/prompt.txt` to change the AI personality and behavior rules.
+Edit `characters/<name>/prompt.md` to change a character's personality and behavior rules.

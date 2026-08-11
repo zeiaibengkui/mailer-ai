@@ -1,5 +1,10 @@
 node_modules/
 dist/
 .env
-data/*
-!data/prompt.txt
+characters/*/conf.toml
+characters/*/senders/
+characters/*/seen.json
+characters/*/crontab.json
+characters/*/proactive_tracker.json
+characters/*/app.lock
+characters/.lock

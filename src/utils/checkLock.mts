@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
-const LOCK_FILE = "data/app.lock";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+const LOCK_FILE = "characters/.lock";
 
 if (existsSync(LOCK_FILE)) {
     const pid = readFileSync(LOCK_FILE, "utf-8").trim();
@@ -7,6 +7,7 @@ if (existsSync(LOCK_FILE)) {
     console.error(`Another instance is running (PID ${pid}). Exiting.`);
     process.exit(1);
 } else {
+    mkdirSync("characters", { recursive: true });
     writeFileSync(LOCK_FILE, String(process.pid));
     process.on("exit", releaseLock);
     process.on("SIGINT", () => { releaseLock(); process.exit(); });

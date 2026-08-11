@@ -1,37 +1,35 @@
 import OpenAI from "openai";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { Character } from "./character.ts";
 
-export const prompt = readFileSync("data/prompt.txt", "utf-8");
-
+/** Shared DeepSeek client — the API key is global in .env, used by all characters. */
 export const client = new OpenAI({
     baseURL: process.env.DEEPSEEK_BASE_URL,
     apiKey: process.env.DEEPSEEK_API_KEY,
 });
 
-const SENDERS_DIR = "data/senders";
-
-function senderFile(sender: string): string {
+function senderFile(char: Character, sender: string): string {
     const encoded = Buffer.from(sender, "utf-8").toString("base64");
-    return `${SENDERS_DIR}/${encoded}.json`;
+    return `${char.dir}/senders/${encoded}.json`;
 }
 
-export function loadHistory(sender: string): ChatCompletionMessageParam[] {
-    const file = senderFile(sender);
+export function loadHistory(char: Character, sender: string): ChatCompletionMessageParam[] {
+    const file = senderFile(char, sender);
     if (!existsSync(file)) return [];
     return JSON.parse(readFileSync(file, "utf-8"));
 }
 
-export function saveHistory(sender: string, history: ChatCompletionMessageParam[]) {
-    mkdirSync(SENDERS_DIR, { recursive: true });
-    writeFileSync(senderFile(sender), JSON.stringify(history, null, 2));
+export function saveHistory(char: Character, sender: string, history: ChatCompletionMessageParam[]) {
+    mkdirSync(`${char.dir}/senders`, { recursive: true });
+    writeFileSync(senderFile(char, sender), JSON.stringify(history, null, 2));
 }
 
 /** Register a sender so the proactive loop will pick them up, even before they email. */
-export function ensureSender(sender: string): boolean {
-    const file = senderFile(sender);
+export function ensureSender(char: Character, sender: string): boolean {
+    const file = senderFile(char, sender);
     if (existsSync(file)) return false;
-    mkdirSync(SENDERS_DIR, { recursive: true });
+    mkdirSync(`${char.dir}/senders`, { recursive: true });
     writeFileSync(file, "[]");
     return true;
 }
@@ -44,19 +42,20 @@ export function withCurrentTime(content: string): string {
 }
 
 export async function chatWithHistory(
+    char: Character,
     sender: string,
     content: string,
 ): Promise<string> {
-    const history = loadHistory(sender);
+    const history = loadHistory(char, sender);
 
     const messages: ChatCompletionMessageParam[] = [
-        { role: "system", content: prompt },
+        { role: "system", content: char.prompt },
         ...history,
         { role: "user", content: withCurrentTime(content) },
     ];
 
     const reply = await client.chat.completions.create({
-        model: "deepseek-chat",
+        model: char.conf.bot.model,
         messages,
     });
 
@@ -64,7 +63,7 @@ export async function chatWithHistory(
 
     history.push({ role: "user", content });
     history.push({ role: "assistant", content: text });
-    saveHistory(sender, history);
+    saveHistory(char, sender, history);
 
     return text;
 }
@@ -77,4 +76,3 @@ export function extractReply(text: string): { subject: string; body: string; } |
     if (!subject) return null;
     return { subject, body };
 }
-

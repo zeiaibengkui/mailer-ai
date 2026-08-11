@@ -1,8 +1,11 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { chatWithHistory } from "./ai";
-import { processAIReply } from "./replyHandler";
+import { chatWithHistory } from "./ai.ts";
+import { processAIReply } from "./replyHandler.ts";
+import type { Character } from "./character.ts";
 
-const CRONTAB_FILE = "data/crontab.json";
+function crontabFile(char: Character): string {
+    return `${char.dir}/crontab.json`;
+}
 
 export type ScheduledTask = {
     id: string;
@@ -10,57 +13,62 @@ export type ScheduledTask = {
     scheduledAt: string; // ISO
 };
 
-export function loadTasks(): ScheduledTask[] {
-    if (!existsSync(CRONTAB_FILE)) return [];
-    return JSON.parse(readFileSync(CRONTAB_FILE, "utf-8"));
+export function loadTasks(char: Character): ScheduledTask[] {
+    const file = crontabFile(char);
+    if (!existsSync(file)) return [];
+    return JSON.parse(readFileSync(file, "utf-8"));
 }
 
-export function saveTasks(tasks: ScheduledTask[]) {
-    mkdirSync("data", { recursive: true });
-    writeFileSync(CRONTAB_FILE, JSON.stringify(tasks, null, 2));
+export function saveTasks(char: Character, tasks: ScheduledTask[]) {
+    mkdirSync(char.dir, { recursive: true });
+    writeFileSync(crontabFile(char), JSON.stringify(tasks, null, 2));
 }
 
-export function addTask(task: ScheduledTask) {
-    const tasks = loadTasks();
+export function addTask(char: Character, task: ScheduledTask) {
+    const tasks = loadTasks(char);
     tasks.push(task);
-    saveTasks(tasks);
+    saveTasks(char, tasks);
 }
 
-export function removeTask(id: string) {
-    const tasks = loadTasks().filter((t) => t.id !== id);
-    saveTasks(tasks);
+export function removeTask(char: Character, id: string) {
+    const tasks = loadTasks(char).filter((t) => t.id !== id);
+    saveTasks(char, tasks);
 }
 
-export function getDueTasks(): ScheduledTask[] {
+export function getDueTasks(char: Character): ScheduledTask[] {
     const now = Date.now();
-    return loadTasks().filter((t) => new Date(t.scheduledAt).getTime() <= now);
+    return loadTasks(char).filter((t) => new Date(t.scheduledAt).getTime() <= now);
 }
 
 export function parseLaterTime(input: string): Date | null {
     const iso = Date.parse(input.trim());
     return isNaN(iso) ? null : new Date(iso);
 }
-export async function processCrontab() {
-    const due = getDueTasks();
+
+export function handleLater(text: string): Date | null {
+    const m = text.match(/__LATER__\(([^)]+)\)/);
+    if (!m) return null;
+    return parseLaterTime(m[1]);
+}
+
+export async function processCrontab(char: Character) {
+    const due = getDueTasks(char);
     for (const task of due) {
         try {
-            removeTask(task.id);
+            removeTask(char, task.id);
             const text = await chatWithHistory(
+                char,
                 task.sender,
                 "你之前说过要在这个时间点回复的。现在时间到了，要不要回复？" +
                 "如果不回复，输出__SKIP__。如果要回复，按正常格式输出主题和正文。" +
                 "另外现在这个时间也可以写到正文里。"
             );
 
-            await processAIReply(task.sender, text);
+            await processAIReply(char, task.sender, text);
         } catch (e) {
-            console.error(`[Crontab] Failed for ${task.sender}:`, e);
+            console.error(`[${char.name}] [Crontab] Failed for ${task.sender}:`, e);
         }
     }
-} export function handleLater(text: string): Date | null {
-    const m = text.match(/__LATER__\(([^)]+)\)/);
-    if (!m) return null;
-    return parseLaterTime(m[1]);
 }
-export const CRONTAB_CHECK_MS = 60000;
 
+export const CRONTAB_CHECK_MS = 60000;
