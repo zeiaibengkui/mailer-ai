@@ -12,3 +12,21 @@ export function formatDateTime(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso
   return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
+
+/** "in 2h 14m" / "overdue" — how long until a scheduled reply fires. */
+export function timeUntil(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  const diffMs = date.getTime() - Date.now()
+  const sign = diffMs < 0 ? '-' : ''
+  const totalMin = Math.round(Math.abs(diffMs) / 60000)
+  const d = Math.floor(totalMin / 1440)
+  const h = Math.floor((totalMin % 1440) / 60)
+  const m = totalMin % 60
+  const parts: string[] = []
+  if (d > 0) parts.push(`${d}d`)
+  if (h > 0) parts.push(`${h}h`)
+  if (parts.length < 2 && m > 0) parts.push(`${m}m`)
+  const body = parts.length > 0 ? parts.join(' ') : 'now'
+  return sign === '-' ? `${body} overdue` : `in ${body}`
+}

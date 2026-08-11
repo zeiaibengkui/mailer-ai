@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
 import IconButton from '@mui/material/IconButton'
+import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Drawer from '@mui/material/Drawer'
 import List from '@mui/material/List'
@@ -15,6 +16,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard'
 import GroupsIcon from '@mui/icons-material/Groups'
 import SettingsIcon from '@mui/icons-material/Settings'
 import { useThemeMode } from './hooks/themeMode.ts'
+import { Monogram } from './components/Monogram.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import Characters from './pages/Characters.tsx'
 import CharacterDetail from './pages/CharacterDetail.tsx'
@@ -35,9 +37,20 @@ export default function App() {
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Mailer AI Control
-          </Typography>
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexGrow: 1 }}>
+            <Monogram name="Mailer" size={36} />
+            <Box>
+              <Typography variant="h6" sx={{ lineHeight: 1.1, letterSpacing: '0.01em' }}>
+                Mailer AI
+              </Typography>
+              <Typography
+                variant="overline"
+                sx={{ display: 'block', lineHeight: 1.2, mt: 0.25, color: 'text.secondary' }}
+              >
+                control
+              </Typography>
+            </Box>
+          </Stack>
           <IconButton color="inherit" onClick={toggle} aria-label="toggle color theme">
             {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
@@ -60,7 +73,16 @@ export default function App() {
                 key={item.to}
                 component={NavLink}
                 to={item.to}
-                sx={{ '&.active': { color: 'primary.main' } }}
+                sx={{
+                  borderRadius: 1,
+                  mb: 0.5,
+                  '&.active': {
+                    color: 'primary.main',
+                    bgcolor: 'action.hover',
+                    boxShadow: (t) => `inset 2px 0 0 ${t.palette.secondary.main}`,
+                  },
+                  '&.active .MuiListItemIcon-root': { color: 'inherit' },
+                }}
               >
                 <ListItemIcon>{item.icon}</ListItemIcon>
                 <ListItemText primary={item.label} />

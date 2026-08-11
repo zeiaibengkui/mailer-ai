@@ -38,10 +38,13 @@ import {
   type SenderSummary,
   type ScheduledTask,
 } from '../api/hooks.ts'
+import { ApiError } from '../api/client.ts'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { EmptyState } from '../components/EmptyState.tsx'
 import { ErrorBanner } from '../components/ErrorBanner.tsx'
-import { formatDateTime } from '../utils.ts'
+import { Monogram } from '../components/Monogram.tsx'
+import { TYPE } from '../theme.ts'
+import { formatDateTime, timeUntil } from '../utils.ts'
 
 type Notice = { severity: 'success' | 'error'; message: string } | null
 
@@ -87,6 +90,12 @@ function AddSenderDialog({
   )
 }
 
+const ROLE_LABEL: Record<string, { label: string; color: 'primary' | 'secondary' | 'default' }> = {
+  assistant: { label: 'sent', color: 'primary' },
+  user: { label: 'received', color: 'secondary' },
+  system: { label: 'note', color: 'default' },
+}
+
 function HistoryDialog({
   charName,
   sender,
@@ -101,40 +110,47 @@ function HistoryDialog({
   const history = useSenderHistory(charName, senderId)
   return (
     <Dialog open={!!senderId} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>History — {sender}</DialogTitle>
+      <DialogTitle>Correspondence — {sender}</DialogTitle>
       <DialogContent dividers>
         {history.isPending && <CircularProgress />}
         {history.isError && <ErrorBanner error={history.error} />}
         {history.isSuccess &&
           (history.data.history.length === 0 ? (
-            <EmptyState text="No conversation yet." />
+            <EmptyState text="Nothing on this line yet. The first exchange will show up here." />
           ) : (
-            <Stack spacing={1}>
-              {history.data.history.map((m, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    p: 1.5,
-                    borderRadius: 1,
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Chip
-                    label={m.role}
-                    size="small"
-                    color={m.role === 'assistant' ? 'primary' : m.role === 'user' ? 'secondary' : 'default'}
-                    sx={{ mb: 1 }}
-                  />
-                  <Typography
-                    variant="body2"
-                    sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            <Stack spacing={1.5}>
+              {history.data.history.map((m, i) => {
+                const meta = ROLE_LABEL[m.role] ?? ROLE_LABEL.system
+                return (
+                  <Paper
+                    key={i}
+                    variant="outlined"
+                    sx={{ p: 2, bgcolor: 'background.default' }}
                   >
-                    {m.content}
-                  </Typography>
-                </Box>
-              ))}
+                    <Stack
+                      direction="row"
+                      sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
+                    >
+                      <Chip
+                        label={meta.label}
+                        size="small"
+                        color={meta.color}
+                        variant="outlined"
+                        sx={{ fontFamily: 'inherit' }}
+                      />
+                      <Typography variant="caption" sx={{ fontSize: '0.68rem' }}>
+                        {String(i + 1).padStart(2, '0')}
+                      </Typography>
+                    </Stack>
+                    <Typography
+                      variant="body2"
+                      sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.65 }}
+                    >
+                      {m.content}
+                    </Typography>
+                  </Paper>
+                )
+              })}
             </Stack>
           ))}
       </DialogContent>
@@ -174,7 +190,13 @@ function ComposeDialog({
           onResult({ severity: 'success', message: `Sent to ${to.trim()}` })
         },
         onError: (e) => {
-          onResult({ severity: 'error', message: e.message })
+          onResult({
+            severity: 'error',
+            message:
+              e instanceof ApiError && e.status === 401
+                ? e.message
+                : "Couldn't send — the SMTP line is down. Check the character's conf.toml and the bot log.",
+          })
         },
       },
     )
@@ -254,19 +276,27 @@ export default function CharacterDetail() {
   return (
     <Box>
       <Stack
-        direction="row"
-        sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
+        direction={{ xs: 'column', md: 'row' }}
+        sx={{ alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', mb: 3, gap: 2 }}
       >
-        <Box>
-          <Typography variant="h5">{detail.name}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {detail.email}
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
-            <Chip label={detail.bot.model} size="small" />
-            <Chip label={`IMAP ${detail.imap.host}:${detail.imap.port}`} size="small" variant="outlined" />
-          </Stack>
-        </Box>
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 2.5 }}>
+          <Monogram name={detail.name} size={64} />
+          <Box>
+            <Typography variant="overline" sx={{ color: 'secondary.main' }}>
+              Agent file
+            </Typography>
+            <Typography variant="h4" sx={{ lineHeight: 1.1 }}>
+              {detail.name}
+            </Typography>
+            <Typography variant="mono" sx={{ color: 'text.secondary', fontSize: '0.78rem', mt: 0.5, display: 'block' }}>
+              {detail.email}
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
+              <Chip label={detail.bot.model} size="small" />
+              <Chip label={`IMAP ${detail.imap.host}:${detail.imap.port}`} size="small" variant="outlined" />
+            </Stack>
+          </Box>
+        </Stack>
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>
             Add sender
@@ -277,14 +307,19 @@ export default function CharacterDetail() {
         </Stack>
       </Stack>
 
-      <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-        Senders ({senders.data?.length ?? 0})
+      <Typography variant="h6" gutterBottom sx={{ mt: 1 }}>
+        Lines ({senders.data?.length ?? 0})
       </Typography>
       {senders.isPending && <CircularProgress />}
       {senders.isError && <ErrorBanner error={senders.error} />}
-      {senders.isSuccess && senders.data.length === 0 && <EmptyState text="No senders yet." />}
+      {senders.isSuccess && senders.data.length === 0 && (
+        <EmptyState
+          text="No conversations on this line yet."
+          action={<Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}>Add sender</Button>}
+        />
+      )}
       {senders.isSuccess && senders.data.length > 0 && (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -296,10 +331,14 @@ export default function CharacterDetail() {
             <TableBody>
               {senders.data.map((s) => (
                 <TableRow key={s.id}>
-                  <TableCell>{s.sender}</TableCell>
-                  <TableCell align="right">{s.exchanges}</TableCell>
+                  <TableCell sx={{ fontSize: '0.74rem', wordBreak: 'break-all', fontFamily: TYPE.mono }}>
+                    {s.sender}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: '0.74rem', fontFamily: TYPE.mono }}>
+                    {s.exchanges}
+                  </TableCell>
                   <TableCell align="right">
-                    <Tooltip title="View history">
+                    <Tooltip title="View correspondence">
                       <IconButton size="small" onClick={() => setHistorySender(s)}>
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
@@ -324,26 +363,35 @@ export default function CharacterDetail() {
       )}
 
       <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-        Scheduled tasks ({tasks.data?.length ?? 0})
+        Queued replies ({tasks.data?.length ?? 0})
       </Typography>
       {tasks.isPending && <CircularProgress />}
       {tasks.isError && <ErrorBanner error={tasks.error} />}
-      {tasks.isSuccess && tasks.data.length === 0 && <EmptyState text="No scheduled tasks." />}
+      {tasks.isSuccess && tasks.data.length === 0 && (
+        <EmptyState text="Nothing is queued — this agent is caught up on its mail." />
+      )}
       {tasks.isSuccess && tasks.data.length > 0 && (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Sender</TableCell>
-                <TableCell>Scheduled at</TableCell>
+                <TableCell>Fires</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {tasks.data.map((t: ScheduledTask) => (
                 <TableRow key={t.id}>
-                  <TableCell>{t.sender}</TableCell>
-                  <TableCell>{formatDateTime(t.scheduledAt)}</TableCell>
+                  <TableCell sx={{ fontSize: '0.74rem', wordBreak: 'break-all', fontFamily: TYPE.mono }}>
+                    {t.sender}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: '0.74rem', fontFamily: TYPE.mono }}>
+                    <Box component="span" sx={{ color: 'secondary.main' }}>
+                      {timeUntil(t.scheduledAt)}
+                    </Box>{' '}
+                    · {formatDateTime(t.scheduledAt)}
+                  </TableCell>
                   <TableCell align="right">
                     <Tooltip title="Cancel task">
                       <IconButton

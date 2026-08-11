@@ -30,14 +30,17 @@ export default function Settings() {
 
   return (
     <Box sx={{ maxWidth: 560 }}>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="overline" sx={{ color: 'secondary.main' }}>
+        Keyring
+      </Typography>
+      <Typography variant="h4" gutterBottom sx={{ mt: 0.5 }}>
         Settings
       </Typography>
 
       <Alert severity="info" sx={{ mb: 2 }}>
-        The bot requires a bearer token for every API call. Set a stable <code>API_KEY</code> in the
-        bot's <code>.env</code> (generate with <code>openssl rand -hex 24</code>) and enter the same
-        value here. It is stored only in this browser&apos;s <code>localStorage</code>.
+        The bot signs every request with a bearer token. Set a stable <code>API_KEY</code> in the
+        bot&apos;s <code>.env</code> (generate with <code>openssl rand -hex 24</code>) and enter the
+        same value here. It is stored only in this browser&apos;s <code>localStorage</code>.
       </Alert>
 
       <Stack spacing={2}>

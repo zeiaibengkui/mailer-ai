@@ -10,7 +10,8 @@ export function ErrorBanner({ error }: { error: unknown }) {
     <Alert severity={is401 ? 'warning' : 'error'} sx={{ my: 1 }}>
       {is401 ? (
         <>
-          Unauthorized — check your API key in <Link to="/settings">Settings</Link>.
+          The API rejected this key. Paste the <code>API_KEY</code> from the bot&apos;s{' '}
+          <code>.env</code> in <Link to="/settings">Settings</Link> and try again.
         </>
       ) : (
         message
