@@ -2,11 +2,11 @@ node_modules/
 dist/
 .env
 characters/*/conf.toml
-characters/*/senders/
+# characters/*/senders/
 characters/*/seen.json
 characters/*/crontab.json
 characters/*/proactive_tracker.json
-characters/*/memory.md
+# characters/*/memory.md
 characters/*/banned.json
 # global_banned.json
 characters/*/app.lock
