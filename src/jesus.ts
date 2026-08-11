@@ -12,7 +12,7 @@ import type { Character } from "./character.ts";
  * protocol) to read and modify the bots' memories, conversations, and behavior, then
  * reports back in plain language.
  */
-const MODEL = process.env.JESUS_MODEL || "deepseek-chat"; // function calling is most reliable here
+const MODEL = process.env.JESUS_MODEL || "deepseek-v4-flash";
 const MAX_TOOL_ITERATIONS = 15;
 
 const JESUS_SYSTEM = `你是“耶稣”——Mailer AI 三个角色（asaperson、beggar、tweakor）的全知监督者与导演。你能看见并修改它们的一切：长期记忆、对话历史、拉黑名单、定时任务。
