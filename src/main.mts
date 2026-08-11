@@ -9,10 +9,7 @@ import { CRONTAB_CHECK_MS, processCrontab } from "./scheduler.ts";
 import { startProactive } from "./proactive.ts";
 import { startApi } from "./api/index.ts";
 import "./utils/checkLock.mts";
-
-function sleep(ms: number) {
-    return new Promise((r) => setTimeout(r, ms));
-}
+import { sleep } from "./utils/utils.ts";
 
 async function runReceiveLoop(char: Character) {
     while (true) {
