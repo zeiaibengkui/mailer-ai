@@ -78,8 +78,8 @@ export async function fetchUnseenEmails(char: Character) {
                     // same sender always map to one conversation.
                     from: normalizeSender(
                         (Array.isArray(fromObj) ? fromObj[0] : fromObj)?.value?.[0]?.address
-                            ?? parsed.from?.text
-                            ?? "",
+                        ?? parsed.from?.text
+                        ?? "",
                     ),
                     text: parsed.text ?? "",
                     uid: msg.uid,
@@ -96,7 +96,7 @@ export async function fetchUnseenEmails(char: Character) {
     }
 }
 
-export async function markAsSeen(char: Character, uids: number[]) {
+export async function markAsSeenOnline(char: Character, uids: number[]) {
     const client = new ImapFlow(imapConfig(char));
     await client.connect();
 
@@ -114,7 +114,7 @@ export async function markAsSeen(char: Character, uids: number[]) {
 
 /** Mark an email as handled (server \Seen flag + local dedup) after its reply is complete. */
 export async function markHandled(char: Character, uid: number) {
-    await markAsSeen(char, [uid]);
+    await markAsSeenOnline(char, [uid]);
     saveSeenUid(char, uid);
 }
 
