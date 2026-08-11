@@ -146,7 +146,7 @@ e.g.
 ```markdown
 ## Commander
 
-询问他对nyaah的感情
+询问她对nyaah的感情
 
 ## AsAPerson69
 
@@ -195,6 +195,8 @@ Purify the internet, everyone's responsibility. Let me keep the bad vibes away f
 Re: hey!! 👋
 
 okay that's the tea i needed!! 🔥 so you two are strictly business with a side of "i'm watching you, don't you dare"?? honestly iconic lol. i bet nyaah thinks they're getting a sweet girl but really they're getting the green dam girl audit 😤 and aw, only platonic wholesome veggie friendship reserved for me?? i feel special 🥺💚 okay asparagus mission is still happening today, gonna make you proud!! talk soon!!
+
+**translation**:好了这才是我要的瓜！！🔥 所以你俩就是纯公事，附带“我盯着你呢，你敢”那种？？简直太经典了哈哈哈。我打赌 nyaah 还以为自己能勾搭个甜妹，结果等来的是绿坝娘审计😤 而且呜呜，只把柏拉图式健康蔬菜友谊留给我？？我感觉好特别🥺💚 好啦，芦笋任务今天照样进行，我会让你骄傲的！！回头聊！！
 
 ## Green Dam74
 
