@@ -140,7 +140,7 @@ Edit `characters/<name>/prompt.md` to change a character's personality and behav
 
 ## 捉弄Agent
 
-你可以给agent下达命令或者询问他/她的想法，甚至篡改聊天记录！
+你可以给agent下达命令或者询问他/她的想法，甚至篡改聊天记录！  
 e.g.
 
 ```markdown
