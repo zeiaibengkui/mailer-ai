@@ -39,7 +39,7 @@ cp .env.example .env
 
 | Var | Description |
 |-----|-------------|
-| `DEEPSEEK_API_KEY` | DeepSeek API key |
+| `DEEPSEEK_API_KEY`  | DeepSeek API key           |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` |
 
 Email credentials live per-character in `characters/<name>/conf.toml` (gitignored).
@@ -48,7 +48,7 @@ Email credentials live per-character in `characters/<name>/conf.toml` (gitignore
 
 Each personality is a directory under `characters/` with two required files:
 
-```
+```sh
 characters/<name>/
 ├── prompt.md            # personality / behavior rules (tracked)
 ├── conf.toml            # email creds + per-character settings (gitignored)
@@ -79,11 +79,9 @@ pass = "your-password"
 fetch_interval_ms = 30000
 proactive_interval_ms = 300000
 proactive_min_gap_ms = 3600000
-model = "deepseek-chat"
+model = "deepseek-v4-flash"
 proactive_model = "deepseek-v4-flash"
 ```
-
-Example: Outlook.com uses IMAP `outlook.office365.com:993` (secure) and SMTP `smtp-mail.outlook.com:587` (`secure = false`, STARTTLS).
 
 Add a new character by creating `characters/<name>/prompt.md` + `conf.toml`. The bot picks it up on next start.
 
@@ -122,6 +120,8 @@ First visit: open **Settings**, paste the `API_KEY` from the bot's `.env`, hit *
 The frontend expects the bot's API on `127.0.0.1:3000` (default `API_PORT`). Build for production with `pnpm --dir frontend build`.
 
 ## How It Works
+
+Generally speaking, Even loop.
 
 1. For each character, polls its IMAP inbox for unseen emails every `fetch_interval_ms`
 2. Parses MIME content, deduplicates via `characters/<name>/seen.json`
