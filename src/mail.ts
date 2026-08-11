@@ -3,6 +3,7 @@ import { ImapFlow, type ImapFlowOptions } from "imapflow";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { simpleParser } from "mailparser";
 import type { Character } from "./character.ts";
+import { normalizeSender } from "./sender.ts";
 
 function seenFile(char: Character): string {
     return `${char.dir}/seen.json`;
@@ -70,9 +71,16 @@ export async function fetchUnseenEmails(char: Character) {
             for await (const msg of client.fetch({ seen: false }, { source: true })) {
                 if (seenUids.has(msg.uid)) continue;
                 const parsed = await simpleParser(msg.source!);
+                const fromObj = parsed.from;
                 messages.push({
                     subject: parsed.subject ?? "",
-                    from: parsed.from?.text ?? "",
+                    // Normalize to the bare email so display-name and plain forms of the
+                    // same sender always map to one conversation.
+                    from: normalizeSender(
+                        (Array.isArray(fromObj) ? fromObj[0] : fromObj)?.value?.[0]?.address
+                            ?? parsed.from?.text
+                            ?? "",
+                    ),
                     text: parsed.text ?? "",
                     uid: msg.uid,
                     date: parsed.date?.toISOString() ?? "",

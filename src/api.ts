@@ -14,6 +14,7 @@ import {
 import { loadTasks, removeTask } from "./scheduler.ts";
 import { clearTrackerEntry } from "./proactive.ts";
 import { sendEmail } from "./mail.ts";
+import { normalizeSender } from "./sender.ts";
 
 const STARTED_AT = Date.now();
 
@@ -98,7 +99,7 @@ export function startApi(chars: Character[]) {
         const ch = findChar(c.req.param("name"));
         if (!ch) return c.json({ error: "unknown character" }, 404);
         const body = await c.req.json().catch(() => null);
-        const sender = typeof body?.sender === "string" ? body.sender.trim() : "";
+        const sender = normalizeSender(typeof body?.sender === "string" ? body.sender : "");
         if (!sender) return c.json({ error: "body requires a non-empty `sender` string" }, 400);
         const created = ensureSender(ch, sender);
         return c.json({ id: encodeSenderId(sender), sender, created }, created ? 201 : 200);
@@ -137,7 +138,7 @@ export function startApi(chars: Character[]) {
         const ch = findChar(c.req.param("name"));
         if (!ch) return c.json({ error: "unknown character" }, 404);
         const body = await c.req.json().catch(() => null);
-        const to = typeof body?.to === "string" ? body.to.trim() : "";
+        const to = normalizeSender(typeof body?.to === "string" ? body.to : "");
         const subject = typeof body?.subject === "string" ? body.subject.trim() : "";
         const text = typeof body?.body === "string" ? body.body.trim() : "";
         if (!to || !subject || !text) {

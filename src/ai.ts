@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { Character } from "./character.ts";
+import { normalizeSender } from "./sender.ts";
 
 /** Shared DeepSeek client — the API key is global in .env, used by all characters. */
 export const client = new OpenAI({
@@ -10,7 +11,8 @@ export const client = new OpenAI({
 });
 
 function senderFile(char: Character, sender: string): string {
-    const encoded = Buffer.from(sender, "utf-8").toString("base64");
+    // Normalize here so every history read/write uses the canonical bare-email key.
+    const encoded = Buffer.from(normalizeSender(sender), "utf-8").toString("base64");
     return `${char.dir}/senders/${encoded}.json`;
 }
 
