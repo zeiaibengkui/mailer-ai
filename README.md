@@ -127,7 +127,7 @@ curl -X POST localhost:3000/characters/asaperson/messages \
 
 ## Frontend (optional)
 
-A MUI control dashboard lives in `frontend/` (React + Vite + TanStack Query). It talks to the bot through a Vite dev proxy, so the API stays bound to `127.0.0.1`.
+A MUI control dashboard lives in `frontend/` (React + Vite + TanStack Query). It calls the bot's REST API directly (the API answers CORS itself) and stays bound to `127.0.0.1`. The API URL defaults to `http://127.0.0.1:3000`; override it with `VITE_API_BASE` in `frontend/.env` if it ever moves.
 
 ```bash
 pnpm --dir frontend install

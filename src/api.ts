@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import type { Character } from "./character.ts";
 import {
@@ -28,6 +29,12 @@ export function startApi(chars: Character[]) {
         console.error("[api] API_KEY is not set — add it to .env (e.g. `openssl rand -hex 24`) and restart.");
         process.exit(1);
     }
+
+    // CORS for the browser dashboard. `*` is safe here because every real request
+    // still needs the Bearer key below, the API only binds to 127.0.0.1, and we
+    // never use cookies. Preflight (OPTIONS) is answered before the auth check so
+    // the browser can send the Authorization header on the actual request.
+    app.use("*", cors({ origin: "*", allowHeaders: ["Content-Type", "Authorization"] }));
 
     app.use("*", async (c, next) => {
         const auth = c.req.header("Authorization");

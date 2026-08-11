@@ -7,7 +7,7 @@ The bot exposes a JSON API on `127.0.0.1` while `pnpm start` is running. It lets
 - `API_PORT` — port to listen on (default `3000`).
 - `API_KEY` — **required**; the bot refuses to start without it. Generate one with `openssl rand -hex 24`. Auth is always enforced: every request needs `Authorization: Bearer <API_KEY>`. The key is stable across restarts.
 
-The server binds to `127.0.0.1` only — it is not reachable from the network.
+The server binds to `127.0.0.1` only — it is not reachable from the network. It answers CORS (`Access-Control-Allow-Origin: *`, headers `Authorization` + `Content-Type`) so the `frontend/` dashboard can call it directly from a browser; every request still requires the bearer key.
 
 ## Sender IDs
 

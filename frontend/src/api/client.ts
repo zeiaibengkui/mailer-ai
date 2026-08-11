@@ -9,9 +9,14 @@ export class ApiError extends Error {
   }
 }
 
-/** Fetch a bot-API endpoint (proxied under /api) with the stored bearer key. */
+// The bot API now answers CORS itself, so the dashboard calls it directly.
+// Override with VITE_API_BASE if the API moves (e.g. behind a same-origin
+// reverse proxy in a future deployment).
+const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://127.0.0.1:3000'
+
+/** Fetch a bot-API endpoint (cross-origin via CORS) with the stored bearer key. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
