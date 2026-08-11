@@ -53,6 +53,14 @@ export interface MemoryEntry {
   text: string
 }
 
+/** Result of the full reply pipeline on a command (status mirrors processAIReply). */
+export interface CommandResult {
+  ok: boolean
+  sender: string
+  status: 'skip' | 'later' | 'sent' | 'no_reply' | 'ban'
+  reply: string
+}
+
 export interface CharacterInfo {
   name: string
   email: string
@@ -300,6 +308,70 @@ export function useAddBan(name: string) {
 }
 
 /** Lift a ban on a sender (they can be replied to again). */
+/** Append a message to a sender's conversation (user = they said, assistant = the character said). */
+export function useAppendHistory(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: { senderId: string; role: 'user' | 'assistant'; content: string }) =>
+      apiFetch<{ ok: boolean; sender: string; historyLength: number }>(
+        `/characters/${encodeURIComponent(name)}/senders/${encodeURIComponent(args.senderId)}/history`,
+        { method: 'POST', body: JSON.stringify({ role: args.role, content: args.content }) },
+      ),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: qk.history(name, v.senderId) })
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Wipe a sender's conversation (keep them registered). */
+export function useClearHistory(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (senderId: string) =>
+      apiFetch<{ ok: boolean; sender: string }>(
+        `/characters/${encodeURIComponent(name)}/senders/${encodeURIComponent(senderId)}/history`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: (_d, senderId) => {
+      qc.invalidateQueries({ queryKey: qk.history(name, senderId) })
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Ask the agent a question (transient — nothing is saved or sent). */
+export function useAskAgent(name: string) {
+  return useMutation({
+    mutationFn: (args: { sender: string; content: string }) =>
+      apiFetch<{ ok: boolean; sender: string; reply: string }>(
+        `/characters/${encodeURIComponent(name)}/ask`,
+        { method: 'POST', body: JSON.stringify(args) },
+      ),
+  })
+}
+
+/** Issue a command — routed through the full reply pipeline (may send a real email). */
+export function useCommandAgent(name: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: { sender: string; command: string }) =>
+      apiFetch<CommandResult>(
+        `/characters/${encodeURIComponent(name)}/command`,
+        { method: 'POST', body: JSON.stringify(args) },
+      ),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: qk.history(name, encodeSenderId(v.sender)) })
+      qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+      qc.invalidateQueries({ queryKey: qk.banned(name) })
+      qc.invalidateQueries({ queryKey: qk.tasks(name) })
+    },
+  })
+}
+
 export function useRemoveBan(name: string) {
   const qc = useQueryClient()
   return useMutation({

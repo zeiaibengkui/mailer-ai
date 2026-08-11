@@ -72,10 +72,17 @@ export function withCurrentTime(content: string): string {
     return `当前时间: ${local} (${now.toISOString()})\n\n${content}`;
 }
 
-export async function chatWithHistory(
+/**
+ * One-shot chat with a character, using the same system prompt (persona + memory),
+ * sender history, and current time as a real reply. When `save` is true the exchange
+ * is persisted to the sender's history (like an incoming email); otherwise it's a
+ * transient probe (the agent answers but nothing is recorded).
+ */
+export async function askAgent(
     char: Character,
     sender: string,
     content: string,
+    save = false,
 ): Promise<string> {
     const history = loadHistory(char, sender);
 
@@ -92,11 +99,22 @@ export async function chatWithHistory(
 
     const text = reply.choices[0]?.message?.content ?? "__SKIP__";
 
-    history.push({ role: "user", content });
-    history.push({ role: "assistant", content: text });
-    saveHistory(char, sender, history);
+    if (save) {
+        history.push({ role: "user", content });
+        history.push({ role: "assistant", content: text });
+        saveHistory(char, sender, history);
+    }
 
     return text;
+}
+
+/** Chat and persist both sides to the sender's history (receive loop, crontab). */
+export function chatWithHistory(
+    char: Character,
+    sender: string,
+    content: string,
+): Promise<string> {
+    return askAgent(char, sender, content, true);
 }
 
 export function extractReply(text: string): { subject: string; body: string; } | null {

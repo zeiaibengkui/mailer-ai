@@ -8,6 +8,7 @@ import "./messages.ts";
 import "./memory.ts";
 import "./banned.ts";
 import "./globalBan.ts";
+import "./agent.ts";
 
 export function startApi(chars: Character[]) {
     configure(chars);

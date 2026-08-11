@@ -9,7 +9,9 @@ import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
+import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
+import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
@@ -26,18 +28,24 @@ import AddIcon from '@mui/icons-material/Add'
 import BlockIcon from '@mui/icons-material/Block'
 import DeleteIcon from '@mui/icons-material/Delete'
 import FlashOnIcon from '@mui/icons-material/FlashOn'
+import HelpIcon from '@mui/icons-material/Help'
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff'
 import NoteAddIcon from '@mui/icons-material/NoteAdd'
 import RestoreIcon from '@mui/icons-material/Restore'
 import SendIcon from '@mui/icons-material/Send'
+import TerminalIcon from '@mui/icons-material/Terminal'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import {
   useAddBan,
   useAddMemory,
   useAddSender,
+  useAppendHistory,
+  useAskAgent,
   useBanned,
   useCharacter,
+  useClearHistory,
+  useCommandAgent,
   useDeleteSender,
   useDeleteTask,
   useMemory,
@@ -48,6 +56,7 @@ import {
   useSetProactiveMuted,
   useTasks,
   useTriggerProactive,
+  type CommandResult,
   type SenderSummary,
   type ScheduledTask,
 } from '../api/hooks.ts'
@@ -109,6 +118,14 @@ const ROLE_LABEL: Record<string, { label: string; color: 'primary' | 'secondary'
   system: { label: 'note', color: 'default' },
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  skip: 'agent decided not to act (__SKIP__)',
+  later: 'scheduled (__LATER__)',
+  sent: 'reply sent as a real email',
+  no_reply: 'could not parse a reply',
+  ban: 'sender banned (__BAN__)',
+}
+
 function HistoryDialog({
   charName,
   sender,
@@ -121,6 +138,56 @@ function HistoryDialog({
   onClose: () => void
 }) {
   const history = useSenderHistory(charName, senderId)
+  const appendMsg = useAppendHistory(charName)
+  const clearHistory = useClearHistory(charName)
+  const ask = useAskAgent(charName)
+  const command = useCommandAgent(charName)
+
+  const [appendRole, setAppendRole] = useState<'user' | 'assistant'>('user')
+  const [appendContent, setAppendContent] = useState('')
+  const [clearOpen, setClearOpen] = useState(false)
+  const [askContent, setAskContent] = useState('')
+  const [askReply, setAskReply] = useState<string | null>(null)
+  const [commandContent, setCommandContent] = useState('')
+  const [commandResult, setCommandResult] = useState<CommandResult | null>(null)
+
+  const doAppend = () => {
+    if (!senderId || !appendContent.trim()) return
+    appendMsg.mutate(
+      { senderId, role: appendRole, content: appendContent.trim() },
+      { onSuccess: () => setAppendContent('') },
+    )
+  }
+
+  const doAsk = () => {
+    if (!askContent.trim()) return
+    setAskReply(null)
+    ask.mutate(
+      { sender, content: askContent.trim() },
+      {
+        onSuccess: (r) => {
+          setAskReply(r.reply)
+          setAskContent('')
+        },
+        onError: (e) => setAskReply(`(error) ${e.message}`),
+      },
+    )
+  }
+
+  const doCommand = () => {
+    if (!commandContent.trim()) return
+    setCommandResult(null)
+    command.mutate(
+      { sender, command: commandContent.trim() },
+      {
+        onSuccess: (r) => {
+          setCommandResult(r)
+          setCommandContent('')
+        },
+      },
+    )
+  }
+
   return (
     <Dialog open={!!senderId} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Correspondence — {sender}</DialogTitle>
@@ -166,10 +233,154 @@ function HistoryDialog({
               })}
             </Stack>
           ))}
+
+        <Divider sx={{ my: 2.5 }} />
+        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+          Edit history
+        </Typography>
+        <Stack spacing={1.5} sx={{ mt: 1 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+            <TextField
+              select
+              size="small"
+              label="Speaker"
+              value={appendRole}
+              onChange={(e) => setAppendRole(e.target.value as 'user' | 'assistant')}
+              sx={{ width: 180 }}
+            >
+              <MenuItem value="user">They said (user)</MenuItem>
+              <MenuItem value="assistant">Character said (assistant)</MenuItem>
+            </TextField>
+            <Button size="small" color="error" onClick={() => setClearOpen(true)}>
+              Clear history
+            </Button>
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              minRows={2}
+              label="Message to inject into the conversation"
+              value={appendContent}
+              onChange={(e) => setAppendContent(e.target.value)}
+            />
+            <Button
+              variant="contained"
+              disabled={!appendContent.trim() || appendMsg.isPending}
+              onClick={doAppend}
+            >
+              {appendMsg.isPending ? 'Adding…' : 'Append'}
+            </Button>
+          </Stack>
+        </Stack>
+
+        <Divider sx={{ my: 2.5 }} />
+        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+          Console
+        </Typography>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Stack spacing={1}>
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              minRows={2}
+              label="Ask the agent — nothing is saved or sent"
+              value={askContent}
+              onChange={(e) => setAskContent(e.target.value)}
+            />
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Button
+                variant="outlined"
+                startIcon={<HelpIcon />}
+                disabled={!askContent.trim() || ask.isPending}
+                onClick={doAsk}
+              >
+                Ask
+              </Button>
+              {ask.isPending && <CircularProgress size={18} />}
+            </Stack>
+            {askReply && (
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
+                  {askReply}
+                </Typography>
+              </Paper>
+            )}
+          </Stack>
+
+          <Stack spacing={1}>
+            <Alert severity="warning" sx={{ '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
+              A command runs the full reply pipeline — a normal reply is sent as a real email to{' '}
+              {sender}; __BAN__ and __LATER__ take effect.
+            </Alert>
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              minRows={2}
+              label="Command the agent"
+              placeholder={'e.g. 用一句话介绍你自己 / 记住我喜欢喝拿铁 / 以后别回这个人了'}
+              value={commandContent}
+              onChange={(e) => setCommandContent(e.target.value)}
+            />
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<TerminalIcon />}
+                disabled={!commandContent.trim() || command.isPending}
+                onClick={doCommand}
+              >
+                Run command
+              </Button>
+              {command.isPending && <CircularProgress size={18} />}
+            </Stack>
+            {command.isPending && (
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Commanding the agent… (this can take a few seconds)
+              </Typography>
+            )}
+            {commandResult && (
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
+                  <Chip
+                    label={commandResult.status}
+                    size="small"
+                    color={commandResult.status === 'sent' ? 'primary' : commandResult.status === 'ban' ? 'error' : 'default'}
+                    variant="outlined"
+                  />
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {STATUS_LABEL[commandResult.status]}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
+                  {commandResult.reply}
+                </Typography>
+              </Paper>
+            )}
+          </Stack>
+        </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+
+      <ConfirmDialog
+        open={clearOpen}
+        title="Clear history"
+        text={`Wipe the entire conversation with "${sender}"? This cannot be undone (the sender stays registered).`}
+        confirmLabel="Clear"
+        loading={clearHistory.isPending}
+        onConfirm={() =>
+          senderId &&
+          clearHistory.mutate(senderId, {
+            onSuccess: () => setClearOpen(false),
+          })
+        }
+        onClose={() => setClearOpen(false)}
+      />
     </Dialog>
   )
 }

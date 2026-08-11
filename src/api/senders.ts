@@ -1,4 +1,4 @@
-import { listSenders, ensureSender, deleteSender, loadHistory, encodeSenderId, decodeSenderId } from "../ai.ts";
+import { listSenders, ensureSender, deleteSender, loadHistory, saveHistory, encodeSenderId, decodeSenderId } from "../ai.ts";
 import { clearTrackerEntry, senderProactiveStates, setMuted, triggerProactive } from "../proactive.ts";
 import { isBanned } from "../ban.ts";
 import { normalizeSender } from "../sender.ts";
@@ -49,6 +49,34 @@ app.delete("/characters/:name/senders/:senderId", (c) => {
     const sender = decodeSenderId(c.req.param("senderId"));
     deleteSender(ch, sender);
     clearTrackerEntry(ch, sender);
+    return c.json({ ok: true, sender });
+});
+
+// Tamper with a conversation: append a message (user = "they said", assistant = "the character
+// said") to steer the agent's context. The next chat/reply will see it.
+app.post("/characters/:name/senders/:senderId/history", async (c) => {
+    const ch = c.get("findChar")(c.req.param("name"));
+    if (!ch) return c.json({ error: "unknown character" }, 404);
+    const body = await c.req.json().catch(() => null);
+    const role = body?.role;
+    const content = typeof body?.content === "string" ? body.content.trim() : "";
+    if (role !== "user" && role !== "assistant") {
+        return c.json({ error: "`role` must be 'user' or 'assistant'" }, 400);
+    }
+    if (!content) return c.json({ error: "body requires a non-empty `content` string" }, 400);
+    const sender = decodeSenderId(c.req.param("senderId"));
+    const history = loadHistory(ch, sender);
+    history.push({ role, content });
+    saveHistory(ch, sender, history);
+    return c.json({ ok: true, sender, historyLength: history.length });
+});
+
+// Clear a conversation (keep the sender registered).
+app.delete("/characters/:name/senders/:senderId/history", (c) => {
+    const ch = c.get("findChar")(c.req.param("name"));
+    if (!ch) return c.json({ error: "unknown character" }, 404);
+    const sender = decodeSenderId(c.req.param("senderId"));
+    saveHistory(ch, sender, []);
     return c.json({ ok: true, sender });
 });
 
