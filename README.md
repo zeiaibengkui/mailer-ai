@@ -87,6 +87,44 @@ pnpm add-sender <character> "friend@example.com"
 
 Registers an email address for a character so it will start proactively messaging them on the next proactive tick (creates an empty history file in `characters/<name>/senders/`).
 
+## REST Control API
+
+Full reference: [`docs/api.md`](docs/api.md). The bot exposes a JSON API on `127.0.0.1` while running. Configure in `.env`:
+
+| Var | Description |
+|-----|-------------|
+| `API_PORT` | Port to listen on (default `3000`) |
+| `API_KEY` | Optional — if set, every request needs `Authorization: Bearer <API_KEY>` |
+
+Sender `id`s in URLs are the sender string encoded as URL-safe base64 (the `/characters/:name/senders` response includes both `id` and the decoded `sender`).
+
+| Method | Path | Action |
+|---|---|---|
+| GET | `/health` | liveness check |
+| GET | `/status` | uptime + per-character summary |
+| GET | `/characters` | all characters with sender lists |
+| GET | `/characters/:name` | character config + senders + tasks |
+| GET | `/characters/:name/senders` | list known senders |
+| GET | `/characters/:name/senders/:senderId` | conversation history |
+| POST | `/characters/:name/senders` | register a sender — body `{ "sender": "friend@example.com" }` |
+| DELETE | `/characters/:name/senders/:senderId` | delete a sender's history |
+| GET | `/characters/:name/tasks` | scheduled `__LATER__` tasks |
+| DELETE | `/characters/:name/tasks/:id` | cancel a scheduled task |
+| POST | `/characters/:name/messages` | send manually — body `{ "to", "subject", "body" }` |
+
+Examples:
+
+```bash
+curl localhost:3000/health
+curl localhost:3000/characters
+curl -X POST localhost:3000/characters/beggar/senders \
+  -H 'content-type: application/json' \
+  -d '{"sender":"friend@example.com"}'
+curl -X POST localhost:3000/characters/asaperson/messages \
+  -H 'content-type: application/json' \
+  -d '{"to":"friend@example.com","subject":"hi","body":"whats up"}'
+```
+
 ## How It Works
 
 1. For each character, polls its IMAP inbox for unseen emails every `fetch_interval_ms`

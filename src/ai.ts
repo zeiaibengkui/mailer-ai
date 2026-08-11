@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { Character } from "./character.ts";
 
@@ -32,6 +32,34 @@ export function ensureSender(char: Character, sender: string): boolean {
     mkdirSync(`${char.dir}/senders`, { recursive: true });
     writeFileSync(file, "[]");
     return true;
+}
+
+/** URL-safe sender id for use in paths (on-disk filenames use standard base64, which can contain `/`/`+`). */
+export function encodeSenderId(sender: string): string {
+    return Buffer.from(sender, "utf-8").toString("base64url");
+}
+
+export function decodeSenderId(id: string): string {
+    return Buffer.from(id, "base64url").toString("utf-8");
+}
+
+/** List a character's known senders: { id, sender, exchanges } — id is the URL-safe key. */
+export function listSenders(char: Character): { id: string; sender: string; exchanges: number }[] {
+    const dir = `${char.dir}/senders`;
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir)
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => {
+            const sender = Buffer.from(f.slice(0, -5), "base64").toString("utf-8");
+            const history = loadHistory(char, sender);
+            return { id: encodeSenderId(sender), sender, exchanges: Math.floor(history.length / 2) };
+        });
+}
+
+/** Delete a sender's history file (their conversation with this character). */
+export function deleteSender(char: Character, sender: string) {
+    const file = senderFile(char, sender);
+    if (existsSync(file)) unlinkSync(file);
 }
 
 /** Prepend the current time so the AI always knows "now" when deciding to reply/schedule. */

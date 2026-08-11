@@ -5,6 +5,7 @@ import { chatWithHistory } from "./ai.ts";
 import { processAIReply } from "./replyHandler.ts";
 import { CRONTAB_CHECK_MS, processCrontab } from "./scheduler.ts";
 import { startProactive } from "./proactive.ts";
+import { startApi } from "./api.ts";
 import "./utils/checkLock.mts";
 
 function sleep(ms: number) {
@@ -38,6 +39,8 @@ function main() {
     const chars = loadCharacters();
     console.log(`Mailer AI started. Characters: ${chars.map((c) => c.name).join(", ") || "(none)"}`);
 
+    startApi(chars);
+
     for (const char of chars) {
         setInterval(() => processCrontab(char), CRONTAB_CHECK_MS);
         startProactive(char);
@@ -45,4 +48,4 @@ function main() {
     }
 }
 
-await main();
+main();

@@ -18,6 +18,14 @@ function saveTracker(char: Character, t: Record<string, string>) {
     writeFileSync(trackFile(char), JSON.stringify(t, null, 2));
 }
 
+/** Forget a sender's last-proactive time (called when their history is deleted). */
+export function clearTrackerEntry(char: Character, sender: string) {
+    const tracker = loadTracker(char);
+    if (!(sender in tracker)) return;
+    delete tracker[sender];
+    saveTracker(char, tracker);
+}
+
 export async function processProactive(char: Character) {
     const dir = `${char.dir}/senders`;
     if (!existsSync(dir)) return;

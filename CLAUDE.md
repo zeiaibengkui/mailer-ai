@@ -12,11 +12,12 @@ Mailer AI is an always-on email auto-reply bot that runs **multiple independent 
 - **Register a contact**: `pnpm add-sender <character> <email> [more...]` — creates an empty history file for that sender under the character's `senders/` dir so the proactive loop will message them.
 - **Install**: `pnpm install`
 - **Typecheck**: `npx tsc --noEmit` (tsconfig has `noEmit: true`; there is no build step).
+- **Control API**: `src/api.ts` starts a Hono server on `127.0.0.1:API_PORT` (default 3000) with optional `Bearer` auth via `API_KEY`. See README "REST Control API" for the endpoint table. Sender `id`s in API URLs are URL-safe base64 (via `encodeSenderId`/`decodeSenderId` in `ai.ts`), while on-disk filenames use standard base64.
 - **Tests**: none. `pnpm test` just prints an error. Verify changes by running the bot and watching logs.
 
 ## Architecture
 
-Entry point `src/main.mts` loads all characters, then per character wires three independent loops:
+Entry point `src/main.mts` loads all characters, starts the REST API (`startApi(chars)`), then per character wires three independent loops:
 
 1. `setInterval(processCrontab, CRONTAB_CHECK_MS)` — fires due scheduled tasks.
 2. `startProactive()` — every `conf.bot.proactive_interval_ms` (default 300000), may message senders with existing history.
@@ -28,7 +29,8 @@ All modules are **parameterized by `Character`** (from `src/character.ts`) — t
 
 - **`src/character.ts`** — `Character`/`CharacterConf` types; `loadCharacters()` scans `characters/*/` and loads each dir that has both `conf.toml` and `prompt.md` (skips incomplete dirs with a warning). Parses TOML via `smol-toml`; applies defaults for optional `[bot]` fields. SMTP/IMAP `secure` (true = implicit TLS, false = STARTTLS) is per-character — Outlook.com SMTP is `secure = false` on port 587.
 - **`src/mail.ts`** — IMAP fetch (`imapflow`) + SMTP send (`nodemailer`) for a character's own credentials. `onReceive(char)` resolves a Promise on the first unseen email **without touching seen state** — `markHandled(char, uid)` (server `\Seen` flag + local `seen.json` dedup) is only called after the reply is complete, so a crashed/failed reply leaves the email unread for retry on restart. Config from `char.conf`.
-- **`src/ai.ts`** — shared DeepSeek client + per-character history under `char.dir/senders/`. `chatWithHistory(char, sender, content)` uses `char.prompt` and `char.conf.bot.model`, appends the sender's persisted history, and pushes both sides of the exchange back to the history file. `withCurrentTime()` prepends the current time to every user message (main, crontab, and proactive all go through it). `extractReply()` splits the model's reply into `{subject, body}` (first line = subject) and filters out lines matching `/同意回复/`.
+- **`src/ai.ts`** — shared DeepSeek client + per-character history under `char.dir/senders/`. `chatWithHistory(char, sender, content)` uses `char.prompt` and `char.conf.bot.model`, appends the sender's persisted history, and pushes both sides of the exchange back to the history file. `withCurrentTime()` prepends the current time to every user message (main, crontab, and proactive all go through it). `extractReply()` splits the model's reply into `{subject, body}` (first line = subject) and filters out lines matching `/同意回复/`. Also exports sender-list helpers used by the API: `listSenders(char)`, `deleteSender(char, sender)`, `ensureSender(char, sender)`, and the URL-safe id codecs `encodeSenderId`/`decodeSenderId`.
+- **`src/api.ts`** — Hono server (`@hono/node-server`) on `127.0.0.1`, started fire-and-forget from `main.mts`. Reuses the loaded `Character[]`; state is file-based so the loops stay in sync with API writes. All handlers wrap errors and return 4xx/5xx JSON instead of crashing.
 - **`src/replyHandler.ts`** — `processAIReply(char, sender, text)` dispatches on the model's output: `__SKIP__` → no-op; `__LATER__(<ISO time>)` → `addTask(char, ...)`; otherwise `extractReply` + `sendEmail(char, ...)`. Returns a status string (`skip | later | sent | no_reply`).
 - **`src/scheduler.ts`** — per-character file-based "crontab" (`char.dir/crontab.json`) of tasks `{id, sender, scheduledAt}`. When a task is due it removes it and asks the AI whether to reply now, then routes through `processAIReply`.
 - **`src/proactive.ts`** — per character, for each sender with history, with probability `exp(-exchangeCount * 0.3)` (decays as conversation grows), prompts the model to send an unsolicited message. Enforces a minimum gap (`char.conf.bot.proactive_min_gap_ms`) via `char.dir/proactive_tracker.json`. Only updates the tracker when a message is actually sent. Uses `char.conf.bot.proactive_model`.
