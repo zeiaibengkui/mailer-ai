@@ -94,7 +94,7 @@ Full reference: [`docs/api.md`](docs/api.md). The bot exposes a JSON API on `127
 | Var | Description |
 |-----|-------------|
 | `API_PORT` | Port to listen on (default `3000`) |
-| `API_KEY` | Optional — if set, every request needs `Authorization: Bearer <API_KEY>` |
+| `API_KEY` | Auth is always on: every request needs `Authorization: Bearer <API_KEY>`. Set a stable key here, otherwise a random one is generated at startup and printed to the log. |
 
 Sender `id`s in URLs are the sender string encoded as URL-safe base64 (the `/characters/:name/senders` response includes both `id` and the decoded `sender`).
 

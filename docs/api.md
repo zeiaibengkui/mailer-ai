@@ -4,10 +4,8 @@ The bot exposes a JSON API on `127.0.0.1` while `pnpm start` is running. It lets
 
 ## Configuration (`.env`)
 
-| Var | Description |
-|-----|-------------|
-| `API_PORT` | Port to listen on (default `3000`) |
-| `API_KEY` | Optional. If set, every request must send `Authorization: Bearer <API_KEY>`; otherwise the server responds `401`. |
+- `API_PORT` — port to listen on (default `3000`).
+- `API_KEY` — optional. Auth is **always enforced**: every request needs `Authorization: Bearer <API_KEY>`. If you don't set `API_KEY`, the bot generates a random key at startup and prints it to the log (the key changes on every restart — set `API_KEY` in `.env` to pin a stable one).
 
 The server binds to `127.0.0.1` only — it is not reachable from the network.
 
@@ -69,7 +67,7 @@ Responds `404 { "error": "unknown character" }` for an unknown name.
 
 `POST /characters/:name/senders` — register a sender so the proactive loop will message them.
 
-```
+```text
 body: { "sender": "friend@example.com" }
 ```
 
@@ -77,7 +75,7 @@ Responds `201 { "id": "...", "sender": "...", "created": true }` on a new sender
 
 `DELETE /characters/:name/senders/:senderId` — delete the sender's history file and clear their proactive gap.
 
-```
+```text
 200 { "ok": true, "sender": "friend@example.com" }
 ```
 
@@ -93,7 +91,7 @@ Responds `201 { "id": "...", "sender": "...", "created": true }` on a new sender
 
 `DELETE /characters/:name/tasks/:id` — cancel a scheduled task.
 
-```
+```text
 200 { "ok": true }
 ```
 
@@ -101,33 +99,36 @@ Responds `201 { "id": "...", "sender": "...", "created": true }` on a new sender
 
 `POST /characters/:name/messages` — send an email right now from this character, and record it in the recipient's history so the AI remembers sending it.
 
-```
+```text
 body: { "to": "friend@example.com", "subject": "hi", "body": "whats up" }
 ```
 
-Responds `200 { "ok": true, "to": "...", "subject": "..." }`. On SMTP failure it responds `500 { "error": "send failed: <reason>" }`.
+Responds `200 { "ok": true, "to": "...", "subject": "..." }`. On SMTP failure it responds `500 { "error": "send failed" }` (the underlying error is only logged server-side).
 
 ## Examples
 
+Every request needs `Authorization: Bearer <API_KEY>` — set `API_KEY` in `.env`, or copy the generated key from the startup log.
+
 ```bash
+AUTH='Authorization: Bearer <API_KEY>'
+
 # Health check
-curl localhost:3000/health
+curl -H "$AUTH" localhost:3000/health
 
 # List everything
-curl localhost:3000/characters
+curl -H "$AUTH" localhost:3000/characters
 
 # Register a sender
 curl -X POST localhost:3000/characters/beggar/senders \
+  -H "$AUTH" \
   -H 'content-type: application/json' \
   -d '{"sender":"friend@example.com"}'
 
 # Send a manual email from the asaperson character
 curl -X POST localhost:3000/characters/asaperson/messages \
+  -H "$AUTH" \
   -H 'content-type: application/json' \
   -d '{"to":"friend@example.com","subject":"hi","body":"whats up"}'
-
-# With an API key set
-curl -H "Authorization: Bearer $API_KEY" localhost:3000/status
 ```
 
 ## Notes

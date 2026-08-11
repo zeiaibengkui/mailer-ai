@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { randomBytes } from "crypto";
 import type { Character } from "./character.ts";
 import {
     listSenders,
@@ -19,16 +20,17 @@ const STARTED_AT = Date.now();
 export function startApi(chars: Character[]) {
     const app = new Hono();
     const port = Number(process.env.API_PORT) || 3000;
-    const apiKey = process.env.API_KEY;
 
-    // Optional bearer-token auth for all routes.
-    if (apiKey) {
-        app.use("*", async (c, next) => {
-            const auth = c.req.header("Authorization");
-            if (auth !== `Bearer ${apiKey}`) return c.json({ error: "unauthorized" }, 401);
-            await next();
-        });
-    }
+    // Auth is always enforced. Set API_KEY in .env for a stable key; otherwise a
+    // random per-session key is generated and printed to the log at startup.
+    const configuredKey = process.env.API_KEY;
+    const apiKey = configuredKey ?? randomBytes(24).toString("hex");
+
+    app.use("*", async (c, next) => {
+        const auth = c.req.header("Authorization");
+        if (auth !== `Bearer ${apiKey}`) return c.json({ error: "unauthorized" }, 401);
+        await next();
+    });
 
     const findChar = (name: string) => chars.find((c) => c.name === name);
 
@@ -68,7 +70,7 @@ export function startApi(chars: Character[]) {
         return c.json({
             name: ch.name,
             email: ch.conf.smtp.user,
-            imap: ch.conf.imap,
+            imap: { host: ch.conf.imap.host, port: ch.conf.imap.port, secure: ch.conf.imap.secure, user: ch.conf.imap.user },
             smtp: { host: ch.conf.smtp.host, port: ch.conf.smtp.port, secure: ch.conf.smtp.secure, user: ch.conf.smtp.user },
             bot: ch.conf.bot,
             senders: listSenders(ch),
@@ -134,7 +136,8 @@ export function startApi(chars: Character[]) {
         try {
             await sendEmail(ch, to, subject, text);
         } catch (e) {
-            return c.json({ error: `send failed: ${(e as Error).message}` }, 500);
+            console.error(`[${ch.name}] [api] send failed:`, e);
+            return c.json({ error: "send failed" }, 500);
         }
         // Record the outgoing message so the AI remembers it sent it.
         const history = loadHistory(ch, to);
@@ -142,6 +145,11 @@ export function startApi(chars: Character[]) {
         saveHistory(ch, to, history);
         return c.json({ ok: true, to, subject });
     });
+
+    if (!configuredKey) {
+        console.log(`[api] API_KEY not set — generated key for this session: ${apiKey}`);
+        console.log("[api] set API_KEY in .env to pin a stable key");
+    }
 
     serve({ fetch: app.fetch, hostname: "127.0.0.1", port }, (info) => {
         console.log(`API listening on http://${info.address}:${info.port} (localhost only)`);
