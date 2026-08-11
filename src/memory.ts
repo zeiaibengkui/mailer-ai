@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { client, withCurrentTime } from "./ai.ts";
+import { client, withCurrentTime, loadHistory } from "./ai.ts";
 import type { Character } from "./character.ts";
 import { normalizeSender } from "./sender.ts";
 
@@ -16,11 +16,16 @@ const DEFAULT_MEMORY_PROMPT =
     "person while talking to another.\n\n" +
     "Output exactly one of:\n" +
     "1. `__SKIP__` — nothing worth remembering.\n" +
-    "2. A single short memory line — one durable fact, first person, no subject prefix. " +
-    "Make clear who it concerns if not obvious (email address if needed). Write in the " +
-    "language the character uses.\n\n" +
-    "Only durable facts: relationships, plans, preferences, promises, problems. Not that a " +
-    "routine exchange happened.";
+    "2. A memory line — one durable fact, first person, no subject prefix. Make clear who " +
+    "it concerns if not obvious (email address if needed). Write in the language the " +
+    "character uses.\n\n" +
+    "If there is no existing memory about this person yet, this is the moment to write the " +
+    "first one: who they are (identity, background) and what they are like (personality, " +
+    "how they relate to you) — at minimum one line, so you recognize them later. Then keep " +
+    "adding durable facts about people: relationships, plans, preferences, promises, " +
+    "problems.\n\n" +
+    "Do not record that a routine exchange happened. Do record who the person is and what " +
+    "they are like.";
 
 function memoryFile(char: Character): string {
     return `${char.dir}/memory.md`;
@@ -83,23 +88,50 @@ function memoryPrompt(): string {
 }
 
 /**
- * After a handled email, ask the model whether the exchange is worth remembering.
+ * After a handled email, ask the memory keeper whether anything is worth remembering.
+ * The keeper sees the recent conversation with this person and any existing memory
+ * about them, so it can recognize a first meeting (and write an identity/personality
+ * memory) versus a continuation (a new durable fact, or `__SKIP__`).
  * Returns the appended entry, or null when the model decided `__SKIP__`.
  */
 export async function rememberExchange(
     char: Character,
     sender: string,
-    emailText: string,
-    replyText: string,
 ): Promise<MemoryEntry | null> {
+    const history = loadHistory(char, sender);
+    const known = loadMemoryEntries(char).filter((e) => e.sender === normalizeSender(sender));
+    const memoryCtx =
+        known.length === 0
+            ? "\n关于这个人还没有任何记忆。"
+            : "\n关于这个人的现有记忆：\n" + known.map((e) => `- ${e.text}`).join("\n");
+
+    // Recent transcript gives the keeper the context a single exchange lacks — who this
+    // person is and how the conversation has been going.
+    const transcript = history
+        .slice(-12)
+        .map((m) => (m.role === "assistant" ? "你" : "对方") + `：${m.content}`)
+        .join("\n\n");
+
+    // If this is the first time we could remember someone and the character actually
+    // engaged with them (didn't `__SKIP__` the reply), require a first identity/personality
+    // memory — otherwise the keeper keeps erring toward "nothing durable" and the person
+    // stays unknown. `__SKIP__` stays allowed for spam and for continuations.
+    const lastAssistant = [...history].reverse().find((m) => m.role === "assistant");
+    const engaged = !String(lastAssistant?.content ?? "").includes("__SKIP__");
+    const forceFirst = known.length === 0 && engaged;
+    const forceNote = forceFirst
+        ? "\n\n这是你们之间的第一次记录。**不要输出 __SKIP__**——你必须写一条记忆，至少包含：这个人是谁（身份/背景）和他们的性格（或你们的关系）。"
+        : "";
+
     const messages: ChatCompletionMessageParam[] = [
-        { role: "system", content: memoryPrompt() },
+        { role: "system", content: memoryPrompt() + forceNote },
         {
             role: "user",
             content: withCurrentTime(
-                `刚刚处理完一封来自 ${sender} 的邮件。\n\n收到的邮件：\n${emailText}\n\n` +
-                    `你发出的回复：\n${replyText}\n\n` +
-                    `如果有值得长期记住的事，输出记忆内容；否则输出 __SKIP__。`,
+                `刚处理完一封来自 ${sender} 的邮件。` +
+                    memoryCtx +
+                    `\n\n你们最近的对话记录（最新的在最后）：\n${transcript}` +
+                    `\n\n如果有值得长期记住的事，输出记忆内容；否则输出 __SKIP__。`,
             ),
         },
     ];

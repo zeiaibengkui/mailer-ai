@@ -37,7 +37,7 @@ async function runReceiveLoop(char: Character) {
             // After every handled email, ask the memory keeper whether to remember it.
             // Its own try/catch: a failed extraction must never re-open the email.
             try {
-                await rememberExchange(char, msg.from, emailText, text);
+                await rememberExchange(char, msg.from);
             } catch (e) {
                 console.error(`[${char.name}] memory write failed:`, e);
             }
