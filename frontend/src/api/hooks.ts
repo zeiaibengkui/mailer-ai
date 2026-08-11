@@ -11,6 +11,7 @@ export const qk = {
   tasks: (name: string) => ['tasks', name] as const,
   memory: (name: string) => ['memory', name] as const,
   banned: (name: string) => ['banned', name] as const,
+  bannedPatterns: ['banned-patterns'] as const,
 }
 
 export interface StatusChar {
@@ -310,6 +311,44 @@ export function useRemoveBan(name: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.banned(name) })
       qc.invalidateQueries({ queryKey: qk.senders(name) })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+/** Global ban patterns (regexps) that apply to every character's senders. */
+export function useBannedPatterns() {
+  return useQuery({
+    queryKey: qk.bannedPatterns,
+    queryFn: () => apiFetch<{ patterns: string[] }>('/banned-patterns'),
+  })
+}
+
+export function useAddBannedPattern() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (pattern: string) =>
+      apiFetch<{ ok: boolean; pattern: string; patterns: string[] }>('/banned-patterns', {
+        method: 'POST',
+        body: JSON.stringify({ pattern }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.bannedPatterns })
+      qc.invalidateQueries({ queryKey: qk.status })
+    },
+  })
+}
+
+export function useRemoveBannedPattern() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (pattern: string) =>
+      apiFetch<{ ok: boolean; patterns: string[] }>(
+        `/banned-patterns/${encodeURIComponent(encodeSenderId(pattern))}`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.bannedPatterns })
       qc.invalidateQueries({ queryKey: qk.status })
     },
   })

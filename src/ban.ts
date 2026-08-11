@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import type { Character } from "./character.ts";
 import { normalizeSender } from "./sender.ts";
+import { isGloballyBanned } from "./globalBan.ts";
 
 /**
  * Per-character ban list: senders the character will permanently never reply to
@@ -28,9 +29,12 @@ export function listBanned(char: Character): string[] {
     return [...new Set(loadBanned(char))].sort();
 }
 
-/** True if the character should never reply to (or proactively message) this sender. */
+/**
+ * True if the character should never reply to (or proactively message) this sender:
+ * either the character's own ban list, or a global ban pattern (regexp) that matches.
+ */
 export function isBanned(char: Character, sender: string): boolean {
-    return loadBanned(char).includes(normalizeSender(sender));
+    return loadBanned(char).includes(normalizeSender(sender)) || isGloballyBanned(sender);
 }
 
 /** Permanently stop replying to a sender. Idempotent; history is kept (unban is reversible). */

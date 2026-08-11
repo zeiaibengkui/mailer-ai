@@ -8,5 +8,6 @@ characters/*/crontab.json
 characters/*/proactive_tracker.json
 characters/*/memory.md
 characters/*/banned.json
+# global_banned.json
 characters/*/app.lock
 characters/.lock

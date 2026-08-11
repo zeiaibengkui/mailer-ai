@@ -7,6 +7,7 @@ import "./tasks.ts";
 import "./messages.ts";
 import "./memory.ts";
 import "./banned.ts";
+import "./globalBan.ts";
 
 export function startApi(chars: Character[]) {
     configure(chars);
