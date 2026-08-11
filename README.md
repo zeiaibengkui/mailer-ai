@@ -1,9 +1,10 @@
 # Mailer AI
 
-AI-powered email auto-reply bot with multiple characters/personalities. Uses DeepSeek to read, decide, and reply to emails via IMAP/SMTP. Each character has its own prompt, its own email inbox, and its own conversation history.
+AI-powered email auto-reply bot with multiple characters/personalities.
 
 ## Features
 
+- Dashboard - See `frontend`
 - **Multi-character** — each `characters/<name>/` dir is an independent bot: own prompt, own IMAP/SMTP credentials, own senders history, seen/crontab/proactive state
 - **IMAP email fetching** — polls for unseen emails, decodes MIME content
 - **AI reply with context** — per-sender conversation history persisted to disk
@@ -11,6 +12,21 @@ AI-powered email auto-reply bot with multiple characters/personalities. Uses Dee
 - **Proactive chat** — AI occasionally starts conversations; frequency decreases over time
 - **Scheduled replies** — `crontab.json`-based delayed delivery
 - **Lock file** — prevents multiple instances
+- 断点续传
+
+  ```
+  [beggar] error: Error: Failed to establish connection in required time
+    at Timeout._onTimeout (/home/zabk/Documents/programming/mailer-ai/node_modules/.pnpm/imapflow@1.3.3/node_modules/imapflow/lib/imap-flow.js:1657:27)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'CONNECT_TIMEOUT',
+  details: { connectionTimeout: 90000 }
+
+  }
+  [asaperson] Replied to <liqi6_6_6@163.com>: Re: 天桥夜谈
+  [beggar] Received: "Re: 破碗币白皮书v2已上传，等你来印T恤🌱📈"
+
+  ```
 
 ## Setup
 
@@ -89,41 +105,7 @@ Registers an email address for a character so it will start proactively messagin
 
 ## REST Control API
 
-Full reference: [`docs/api.md`](docs/api.md). The bot exposes a JSON API on `127.0.0.1` while running. Configure in `.env`:
-
-| Var | Description |
-|-----|-------------|
-| `API_PORT` | Port to listen on (default `3000`) |
-| `API_KEY` | **Required** — the bot exits at startup if missing. Generate with `openssl rand -hex 24`. Auth is always on: every request needs `Authorization: Bearer <API_KEY>`. |
-
-Sender `id`s in URLs are the sender string encoded as URL-safe base64 (the `/characters/:name/senders` response includes both `id` and the decoded `sender`).
-
-| Method | Path | Action |
-|---|---|---|
-| GET | `/health` | liveness check |
-| GET | `/status` | uptime + per-character summary |
-| GET | `/characters` | all characters with sender lists |
-| GET | `/characters/:name` | character config + senders + tasks |
-| GET | `/characters/:name/senders` | list known senders |
-| GET | `/characters/:name/senders/:senderId` | conversation history |
-| POST | `/characters/:name/senders` | register a sender — body `{ "sender": "friend@example.com" }` |
-| DELETE | `/characters/:name/senders/:senderId` | delete a sender's history |
-| GET | `/characters/:name/tasks` | scheduled `__LATER__` tasks |
-| DELETE | `/characters/:name/tasks/:id` | cancel a scheduled task |
-| POST | `/characters/:name/messages` | send manually — body `{ "to", "subject", "body" }` |
-
-Examples:
-
-```bash
-curl localhost:3000/health
-curl localhost:3000/characters
-curl -X POST localhost:3000/characters/beggar/senders \
-  -H 'content-type: application/json' \
-  -d '{"sender":"friend@example.com"}'
-curl -X POST localhost:3000/characters/asaperson/messages \
-  -H 'content-type: application/json' \
-  -d '{"to":"friend@example.com","subject":"hi","body":"whats up"}'
-```
+See [`docs/api.md`](docs/api.md).
 
 ## Frontend (optional)
 
@@ -131,7 +113,8 @@ A MUI control dashboard lives in `frontend/` (React + Vite + TanStack Query). It
 
 ```bash
 pnpm --dir frontend install
-pnpm --dir frontend dev        # http://localhost:5173
+pnpm --dir frontend dev        
+# http://localhost:5173
 ```
 
 First visit: open **Settings**, paste the `API_KEY` from the bot's `.env`, hit *Test connection*. Then the Dashboard shows uptime and all characters; each character page lists senders, lets you view conversation history, add/delete senders, cancel scheduled tasks, and send emails manually.

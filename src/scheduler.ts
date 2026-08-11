@@ -56,19 +56,31 @@ export async function processCrontab(char: Character) {
     for (const task of due) {
         try {
             removeTask(char, task.id);
-            const text = await chatWithHistory(
-                char,
-                task.sender,
-                "你之前说过要在这个时间点回复的。现在时间到了，要不要回复？" +
-                "如果不回复，输出__SKIP__。如果要回复，按正常格式输出主题和正文。" +
-                "另外现在这个时间也可以写到正文里。"
-            );
+            const text = await chatWithHistory(char, task.sender, crontabPrompt());
 
             await processAIReply(char, task.sender, text);
         } catch (e) {
             console.error(`[${char.name}] [Crontab] Failed for ${task.sender}:`, e);
         }
     }
+}
+
+/** Shared crontab trigger prompt (prompts/crontab.md), editable as data. */
+const CRONTAB_PROMPT_PATH = "prompts/crontab.md";
+const DEFAULT_CRONTAB_PROMPT =
+    "你之前说过要在这个时间点回复的。现在时间到了，要不要回复？" +
+    "如果不回复，输出__SKIP__。如果要回复，按正常格式输出主题和正文。" +
+    "另外现在这个时间也可以写到正文里。";
+
+/** The due-task message sent to the AI; falls back to a built-in default if prompts/crontab.md is missing. */
+export function crontabPrompt(): string {
+    if (!existsSync(CRONTAB_PROMPT_PATH)) return DEFAULT_CRONTAB_PROMPT;
+    // Strip `#` heading lines (human labels) — only the prompt text reaches the model.
+    return readFileSync(CRONTAB_PROMPT_PATH, "utf-8")
+        .split("\n")
+        .filter((l) => !/^#\s/.test(l))
+        .join("\n")
+        .trim();
 }
 
 export const CRONTAB_CHECK_MS = 60000;

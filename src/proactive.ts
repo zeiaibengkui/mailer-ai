@@ -4,6 +4,28 @@ import type { ChatCompletionMessageParam } from "openai/resources";
 import { loadHistory, client, saveHistory, withCurrentTime } from "./ai.ts";
 import type { Character } from "./character.ts";
 
+/** Shared proactive prompts (prompts/proactive.md): wake-up (system) + trigger (user), split by a `---` line. */
+const PROACTIVE_PROMPT_PATH = "prompts/proactive.md";
+const DEFAULT_PROACTIVE_SYS = "现在主动给主人发一条消息，关心一下主人或者找个话题聊天。";
+const DEFAULT_PROACTIVE_USER =
+    "（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
+    "如果主人留了定时任务但你没设__LATER__，可以现在设置）";
+
+/** Read prompts/proactive.md; falls back to built-in defaults if the file is missing. */
+function proactivePrompts(): { sys: string; user: string } {
+    if (!existsSync(PROACTIVE_PROMPT_PATH)) {
+        return { sys: DEFAULT_PROACTIVE_SYS, user: DEFAULT_PROACTIVE_USER };
+    }
+    // Two sections split by a `---` line; `#` heading lines are human labels and are stripped.
+    const [sys, user] = readFileSync(PROACTIVE_PROMPT_PATH, "utf-8").split(/\n---\n/);
+    const clean = (s: string | undefined) =>
+        (s ?? "").split("\n").filter((l) => !/^#\s/.test(l)).join("\n").trim();
+    return {
+        sys: clean(sys) || DEFAULT_PROACTIVE_SYS,
+        user: clean(user) || DEFAULT_PROACTIVE_USER,
+    };
+}
+
 function trackFile(char: Character): string {
     return `${char.dir}/proactive_tracker.json`;
 }
@@ -63,13 +85,13 @@ export async function proactiveChat(char: Character, sender: string): Promise<st
     const prob = Math.exp(-exchangeCount * 0.3);
     if (Math.random() > prob) return null;
 
+    const { sys, user } = proactivePrompts();
     const messages: ChatCompletionMessageParam[] = [
-        { role: "system", content: char.prompt + "\n\n现在主动给主人发一条消息，关心一下主人或者找个话题聊天。" },
+        { role: "system", content: char.prompt + "\n\n" + sys },
         ...history,
         {
             role: "user",
-            content: withCurrentTime("（随机唤醒，可以主动找主人聊天,或者太晚了就__SKIP__或者__LATER__吧。" +
-                "如果主人留了定时任务但你没设__LATER__，可以现在设置）"),
+            content: withCurrentTime(user),
         },
     ];
 

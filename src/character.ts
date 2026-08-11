@@ -43,6 +43,8 @@ export interface Character {
 }
 
 const CHARACTERS_DIR = "characters";
+/** Optional shared prompt (prompts/base.md), appended to every character's own prompt.md. */
+const SHARED_PROMPT_PATH = "prompts/base.md";
 
 function normalizeConf(raw: Record<string, any>): CharacterConf {
     return {
@@ -80,7 +82,11 @@ export function loadCharacter(name: string): Character | null {
         return null;
     }
     const conf = normalizeConf(parse(readFileSync(confPath, "utf-8")) as Record<string, any>);
-    const prompt = readFileSync(promptPath, "utf-8");
+    // Compose the shared prompt (all characters) with this character's persona.
+    // The shared reply protocol is appended last so it sits closest to the model's output.
+    const prompt = existsSync(SHARED_PROMPT_PATH)
+        ? readFileSync(promptPath, "utf-8") + "\n\n" + readFileSync(SHARED_PROMPT_PATH, "utf-8")
+        : readFileSync(promptPath, "utf-8");
     return { name, dir, conf, prompt };
 }
 
