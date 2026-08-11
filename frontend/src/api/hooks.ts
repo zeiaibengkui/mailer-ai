@@ -354,6 +354,24 @@ export function useAppendHistory(name: string) {
   })
 }
 
+/** Wipe every conversation across all characters, keeping every line registered. */
+export function useClearAllCharactersHistory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; cleared: number }>('/history', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+/** Wipe every character's long-term memory. */
+export function useClearAllCharactersMemory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean }>('/memory', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
 /** Wipe every conversation for the character, keeping all senders (lines) registered. */
 export function useClearAllHistory(name: string) {
   const qc = useQueryClient()

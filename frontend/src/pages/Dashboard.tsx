@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
@@ -13,7 +15,16 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
-import { useCharacters, useStatus, type SenderSummary } from '../api/hooks.ts'
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
+import {
+  useCharacters,
+  useClearAllCharactersHistory,
+  useClearAllCharactersMemory,
+  useStatus,
+  type SenderSummary,
+} from '../api/hooks.ts'
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
 import { ErrorBanner } from '../components/ErrorBanner.tsx'
 import { Lamp } from '../components/Lamp.tsx'
 import { Monogram } from '../components/Monogram.tsx'
@@ -24,6 +35,10 @@ export default function Dashboard() {
   const status = useStatus()
   const chars = useCharacters()
   const navigate = useNavigate()
+  const clearAllHist = useClearAllCharactersHistory()
+  const clearAllMem = useClearAllCharactersMemory()
+  const [clearHistoriesOpen, setClearHistoriesOpen] = useState(false)
+  const [clearMemoryOpen, setClearMemoryOpen] = useState(false)
 
   if (status.isPending || chars.isPending) return <CircularProgress />
   if (status.isError) return <ErrorBanner error={status.error} />
@@ -61,6 +76,27 @@ export default function Dashboard() {
           {totalSenders} lines · {totalExchanges} exchanges · {totalTasks} queued
         </Typography>
       </Box>
+
+      <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+        <Button
+          size="small"
+          variant="outlined"
+          color="warning"
+          startIcon={<DeleteSweepIcon />}
+          onClick={() => setClearHistoriesOpen(true)}
+        >
+          Clear all histories
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteForeverIcon />}
+          onClick={() => setClearMemoryOpen(true)}
+        >
+          Clear all memory
+        </Button>
+      </Stack>
 
       <Grid container spacing={2.5}>
         {chars.data.map((c, i) => {
@@ -201,6 +237,26 @@ export default function Dashboard() {
           </TableContainer>
         )}
       </Box>
+
+      <ConfirmDialog
+        open={clearHistoriesOpen}
+        title="Clear all histories"
+        text="Wipe every conversation across all characters? Every sender (line) stays registered. This cannot be undone."
+        confirmLabel="Clear"
+        loading={clearAllHist.isPending}
+        onConfirm={() => clearAllHist.mutate(undefined, { onSuccess: () => setClearHistoriesOpen(false) })}
+        onClose={() => setClearHistoriesOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={clearMemoryOpen}
+        title="Clear all memory"
+        text="Wipe every character's long-term memory? This cannot be undone."
+        confirmLabel="Clear"
+        loading={clearAllMem.isPending}
+        onConfirm={() => clearAllMem.mutate(undefined, { onSuccess: () => setClearMemoryOpen(false) })}
+        onClose={() => setClearMemoryOpen(false)}
+      />
     </Box>
   )
 }

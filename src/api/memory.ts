@@ -22,6 +22,12 @@ app.post("/characters/:name/memory", async (c) => {
     return c.json({ ok: true, at: entry.at, sender: entry.sender });
 });
 
+// Global: wipe every character's long-term memory.
+app.delete("/memory", (c) => {
+    for (const ch of c.get("chars")) clearMemory(ch);
+    return c.json({ ok: true });
+});
+
 // Remove one memory entry (identified by its `at` timestamp).
 app.delete("/characters/:name/memory/:at", (c) => {
     const ch = c.get("findChar")(c.req.param("name"));
